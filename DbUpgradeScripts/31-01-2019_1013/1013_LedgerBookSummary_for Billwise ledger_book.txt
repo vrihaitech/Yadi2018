@@ -1,0 +1,146 @@
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+GO
+ALTER  PROCEDURE [dbo].[LedgerBookSummary] --exec LedgerBookSummary '01-Apr-2018','01-Apr-2019',15,1,'104'
+@FromDate          datetime,
+@ToDate            datetime,
+@VchType           int,
+@CompanyNo		   varchar(50),
+@PartyNo		   varchar(max)
+AS
+
+Declare @StrQry varchar(max)
+if (@VchType=15)
+begin
+set @StrQry = 
+--' SELECT TVoucherEntry.PayTypeNo, TVoucherEntry.VoucherDate, TVoucherEntry.VoucherUserNo, TVoucherEntry.VoucherTypeCode, ' +
+-- '(SELECT  TVoucherDetails.Debit  AS Expr1) AS billamount, MPayType.PayTypeName as PayTypeName,TVoucherEntry.VoucherDate AS recvDate,   ' +
+--' (SELECT     TVoucherDetails.Credit  AS Expr1) AS recvamount,  (Select Case When TCC.ChequeNo<>'''' Then TCC.ChequeNo ' +
+--' Else TCC.CreditCardNo End From TVoucherChqCreditDetails TCC Where TCC.FkVoucherNo=TVoucherEntry.PKVoucherno) ,' +
+-- '   MLedger.LedgerName,MLedger.LedgerNo, ' +
+--'  TVoucherEntry.Remark ' +
+--'  AS Remark ,TVoucherEntry.NARRATION  from  TVoucherEntry INNER JOIN TVoucherDetails ON TVoucherEntry.PKVoucherNo = TVoucherDetails.FkVoucherNo ' +
+--' INNER JOIN MVoucherType ON  TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode ' +
+--' left join MPayType on MPayType.PKPayTypeNo=TVoucherEntry.paytypeno ' +
+--' INNER JOIN  fn_Split ('''+(@PartyNo)+ ''','','' )As Party_BILL on TVoucherDetails.LedgerNo= CAST(Party_BILL.value AS numeric) '+  ' INNER JOIN MLedger ON MLedger.LedgerNo = CAST(Party_BILL.value AS numeric) ' +
+--' WHERE TVoucherEntry.VoucherTypeCode not in(111,109,115,130,131,136,107,112,113) and TVoucherEntry.IsCancel=0 And TVoucherEntry.VoucherDate>= '''+cast(@FromDate as varchar)+'''and TVoucherEntry.VoucherDate<='''+cast(@ToDate as varchar)+''''+
+--' ORDER BY TVoucherEntry.VoucherDate, TVoucherEntry.VoucherUserNo '
+
+'SELECT 0 as PayTypeNo, '''+cast(@FromDate as varchar)+''' as VoucherDate, 0 as VoucherUserNo, 0 as VoucherTypeCode,
+ sum(TVoucherDetails.Debit) AS billamount, ''Opening '' as PayTypeName,'''+cast(@FromDate as varchar)+''' AS recvDate,    sum(TVoucherDetails.Credit ) AS recvamount,
+'''' as cheque ,   MLedger.LedgerName,MLedger.LedgerNo,   ''Opening''  AS Remark ,''Opening Balance'' as NARRATION 
+ from  TVoucherEntry INNER JOIN TVoucherDetails ON TVoucherEntry.PKVoucherNo = TVoucherDetails.FkVoucherNo 
+ INNER JOIN MVoucherType ON  TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode 
+ left join MPayType on MPayType.PKPayTypeNo=TVoucherEntry.paytypeno 
+INNER JOIN  fn_Split ('''+(@PartyNo)+ ''','','' )As Party_BILL on TVoucherDetails.LedgerNo= CAST(Party_BILL.value AS numeric)
+  INNER JOIN MLedger ON MLedger.LedgerNo = CAST(Party_BILL.value AS numeric)  
+WHERE TVoucherEntry.VoucherTypeCode not in(111,109,115,130,131,136,107,112,113) 
+and TVoucherEntry.IsCancel=0 And TVoucherEntry.VoucherDate<'''+cast(@FromDate as varchar)+'''
+group by  MLedger.LedgerName,MLedger.LedgerNo  union all'+
+
+' SELECT TVoucherEntry.PayTypeNo, TVoucherEntry.VoucherDate, TVoucherEntry.VoucherUserNo, TVoucherEntry.VoucherTypeCode, ' +
+ '(SELECT  TVoucherDetails.Debit  AS Expr1) AS billamount, MPayType.PayTypeName as PayTypeName,TVoucherEntry.VoucherDate AS recvDate,   ' +
+' (SELECT     TVoucherDetails.Credit  AS Expr1) AS recvamount,  (Select Case When TCC.ChequeNo<>'''' Then TCC.ChequeNo ' +
+' Else TCC.CreditCardNo End From TVoucherChqCreditDetails TCC Where TCC.FkVoucherNo=TVoucherEntry.PKVoucherno) ,' +
+ '   MLedger.LedgerName,MLedger.LedgerNo, ' +
+'  TVoucherEntry.Remark ' +
+'  AS Remark ,TVoucherEntry.NARRATION  from  TVoucherEntry INNER JOIN TVoucherDetails ON TVoucherEntry.PKVoucherNo = TVoucherDetails.FkVoucherNo ' +
+' INNER JOIN MVoucherType ON  TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode ' +
+' left join MPayType on MPayType.PKPayTypeNo=TVoucherEntry.paytypeno ' +
+' INNER JOIN  fn_Split ('''+(@PartyNo)+ ''','','' )As Party_BILL on TVoucherDetails.LedgerNo= CAST(Party_BILL.value AS numeric) '+  ' INNER JOIN MLedger ON MLedger.LedgerNo = CAST(Party_BILL.value AS numeric) ' +
+' WHERE TVoucherEntry.VoucherTypeCode not in(111,109,115,130,131,136,107,112,113) and TVoucherEntry.IsCancel=0 And TVoucherEntry.VoucherDate>= '''+cast(@FromDate as varchar)+'''and TVoucherEntry.VoucherDate<='''+cast(@ToDate as varchar)+''''
+
+end
+else  if (@VchType=9)
+
+begin
+set @StrQry = 
+'SELECT 0 as PayTypeNo, '''+cast(@FromDate as varchar)+''' as VoucherDate, 0 as VoucherUserNo, 0 as VoucherTypeCode,
+ sum(TVoucherDetails.Credit) AS billamount, ''Opening '' as PayTypeName,'''+cast(@FromDate as varchar)+''' AS recvDate,    sum(TVoucherDetails.Debit ) AS recvamount,
+'''' as cheque ,   MLedger.LedgerName,MLedger.LedgerNo,   ''Opening''  AS Remark ,''Opening Balance'' as NARRATION 
+ from  TVoucherEntry INNER JOIN TVoucherDetails ON TVoucherEntry.PKVoucherNo = TVoucherDetails.FkVoucherNo 
+ INNER JOIN MVoucherType ON  TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode 
+ left join MPayType on MPayType.PKPayTypeNo=TVoucherEntry.paytypeno 
+INNER JOIN  fn_Split ('''+(@PartyNo)+ ''','','' )As Party_BILL on TVoucherDetails.LedgerNo= CAST(Party_BILL.value AS numeric)
+  INNER JOIN MLedger ON MLedger.LedgerNo = CAST(Party_BILL.value AS numeric)  
+WHERE TVoucherEntry.VoucherTypeCode not in(111,109,115,130,131,136,107,112,113) 
+and TVoucherEntry.IsCancel=0 And TVoucherEntry.VoucherDate<'''+cast(@FromDate as varchar)+'''
+group by  MLedger.LedgerName,MLedger.LedgerNo  union all'+
+' SELECT TVoucherEntry.PayTypeNo, TVoucherEntry.VoucherDate,TVoucherEntry.Reference as VoucherUserNo, TVoucherEntry.VoucherTypeCode, ' +
+ '(SELECT  TVoucherDetails.Credit  AS Expr1) AS billamount, MPayType.PayTypeName  as PayTypeName,TVoucherEntry.VoucherDate AS recvDate,   ' +
+' (SELECT     TVoucherDetails.Debit  AS Expr1) AS recvamount,  (Select Case When TCC.ChequeNo<>'''' Then TCC.ChequeNo ' +
+' Else TCC.CreditCardNo End From TVoucherChqCreditDetails TCC Where TCC.FkVoucherNo=TVoucherEntry.PKVoucherno) , ' +
+ '  MLedger.LedgerName,MLedger.LedgerNo, ' +
+'  TVoucherEntry.Remark ' +
+'  AS Remark ,TVoucherEntry.NARRATION  from  TVoucherEntry INNER JOIN TVoucherDetails ON TVoucherEntry.PKVoucherNo = TVoucherDetails.FkVoucherNo ' +
+' INNER JOIN MVoucherType ON  TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode ' +
+' left join MPayType on MPayType.PKPayTypeNo=TVoucherEntry.paytypeno ' +
+' INNER JOIN  fn_Split ('''+(@PartyNo)+ ''','','' )As Party_BILL on TVoucherDetails.LedgerNo= CAST(Party_BILL.value AS numeric) '+  ' INNER JOIN MLedger ON MLedger.LedgerNo = CAST(Party_BILL.value AS numeric) ' +
+' WHERE TVoucherEntry.VoucherTypeCode not in(111,109,115,130,131,136,107,112,113) and  TVoucherEntry.IsCancel=0 And TVoucherEntry.VoucherDate>= '''+cast(@FromDate as varchar)+'''and TVoucherEntry.VoucherDate<='''+cast(@ToDate as varchar)+''''
+--' ORDER BY TVoucherEntry.VoucherDate, TVoucherEntry.VoucherUserNo '
+end
+else  if (@VchType=109)
+
+begin
+set @StrQry = 
+'SELECT 0 as PayTypeNo, '''+cast(@FromDate as varchar)+''' as VoucherDate, 0 as VoucherUserNo, 0 as VoucherTypeCode,
+ sum(TVoucherDetails.Credit) AS billamount, ''Opening '' as PayTypeName,'''+cast(@FromDate as varchar)+''' AS recvDate,    sum(TVoucherDetails.Debit ) AS recvamount,
+'''' as cheque ,   MLedger.LedgerName,MLedger.LedgerNo,   ''Opening''  AS Remark ,''Opening Balance'' as NARRATION 
+ from  TVoucherEntry INNER JOIN TVoucherDetails ON TVoucherEntry.PKVoucherNo = TVoucherDetails.FkVoucherNo 
+ INNER JOIN MVoucherType ON  TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode 
+ left join MPayType on MPayType.PKPayTypeNo=TVoucherEntry.paytypeno 
+INNER JOIN  fn_Split ('''+(@PartyNo)+ ''','','' )As Party_BILL on TVoucherDetails.LedgerNo= CAST(Party_BILL.value AS numeric)
+  INNER JOIN MLedger ON MLedger.LedgerNo = CAST(Party_BILL.value AS numeric)  
+WHERE TVoucherEntry.VoucherTypeCode not in(11,9,15,30,31,36,7,12,13) 
+and TVoucherEntry.IsCancel=0 And TVoucherEntry.VoucherDate<'''+cast(@FromDate as varchar)+'''
+group by  MLedger.LedgerName,MLedger.LedgerNo  union all'+
+' SELECT TVoucherEntry.PayTypeNo, TVoucherEntry.VoucherDate,TVoucherEntry.Reference as VoucherUserNo, TVoucherEntry.VoucherTypeCode, ' +
+ '(SELECT  TVoucherDetails.Credit  AS Expr1) AS billamount, MPayType.PayTypeName  as PayTypeName,TVoucherEntry.VoucherDate AS recvDate,   ' +
+' (SELECT     TVoucherDetails.Debit  AS Expr1) AS recvamount,  (Select Case When TCC.ChequeNo<>'''' Then TCC.ChequeNo ' +
+' Else TCC.CreditCardNo End From TVoucherChqCreditDetails TCC Where TCC.FkVoucherNo=TVoucherEntry.PKVoucherno) , ' +
+ '  MLedger.LedgerName,MLedger.LedgerNo, ' +
+'  TVoucherEntry.Remark ' +
+'  AS Remark ,TVoucherEntry.NARRATION  from  TVoucherEntry INNER JOIN TVoucherDetails ON TVoucherEntry.PKVoucherNo = TVoucherDetails.FkVoucherNo ' +
+' INNER JOIN MVoucherType ON  TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode ' +
+' left join MPayType on MPayType.PKPayTypeNo=TVoucherEntry.paytypeno ' +
+' INNER JOIN  fn_Split ('''+(@PartyNo)+ ''','','' )As Party_BILL on TVoucherDetails.LedgerNo= CAST(Party_BILL.value AS numeric) '+  ' INNER JOIN MLedger ON MLedger.LedgerNo = CAST(Party_BILL.value AS numeric) ' +
+' WHERE TVoucherEntry.VoucherTypeCode not in(11,9,15,30,31,36,7,12,13) and  TVoucherEntry.IsCancel=0 And TVoucherEntry.VoucherDate>= '''+cast(@FromDate as varchar)+'''and TVoucherEntry.VoucherDate<='''+cast(@ToDate as varchar)+''''
+--' ORDER BY TVoucherEntry.VoucherDate, TVoucherEntry.VoucherUserNo '
+end
+else if (@VchType=115)
+begin
+set @StrQry = 
+'SELECT 0 as PayTypeNo, '''+cast(@FromDate as varchar)+''' as VoucherDate, 0 as VoucherUserNo, 0 as VoucherTypeCode,
+ sum(TVoucherDetails.Debit) AS billamount, ''Opening '' as PayTypeName,'''+cast(@FromDate as varchar)+''' AS recvDate,    sum(TVoucherDetails.Credit ) AS recvamount,
+'''' as cheque ,   MLedger.LedgerName,MLedger.LedgerNo,   ''Opening''  AS Remark ,''Opening Balance'' as NARRATION 
+ from  TVoucherEntry INNER JOIN TVoucherDetails ON TVoucherEntry.PKVoucherNo = TVoucherDetails.FkVoucherNo 
+ INNER JOIN MVoucherType ON  TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode 
+ left join MPayType on MPayType.PKPayTypeNo=TVoucherEntry.paytypeno 
+INNER JOIN  fn_Split ('''+(@PartyNo)+ ''','','' )As Party_BILL on TVoucherDetails.LedgerNo= CAST(Party_BILL.value AS numeric)
+  INNER JOIN MLedger ON MLedger.LedgerNo = CAST(Party_BILL.value AS numeric)  
+WHERE TVoucherEntry.VoucherTypeCode not in(11,9,15,30,31,36,7,12,13) 
+and TVoucherEntry.IsCancel=0 And TVoucherEntry.VoucherDate<'''+cast(@FromDate as varchar)+'''
+group by  MLedger.LedgerName,MLedger.LedgerNo  union all'+
+' SELECT TVoucherEntry.PayTypeNo, TVoucherEntry.VoucherDate, TVoucherEntry.VoucherUserNo, TVoucherEntry.VoucherTypeCode, ' +
+ '(SELECT  TVoucherDetails.Debit  AS Expr1) AS billamount, MPayType.PayTypeName as PayTypeName,TVoucherEntry.VoucherDate AS recvDate,   ' +
+' (SELECT     TVoucherDetails.Credit  AS Expr1) AS recvamount,  (Select Case When TCC.ChequeNo<>'''' Then TCC.ChequeNo ' +
+' Else TCC.CreditCardNo End From TVoucherChqCreditDetails TCC Where TCC.FkVoucherNo=TVoucherEntry.PKVoucherno) ,' +
+ '   MLedger.LedgerName,MLedger.LedgerNo, ' +
+'  TVoucherEntry.Remark ' +
+'  AS Remark ,TVoucherEntry.NARRATION  from  TVoucherEntry INNER JOIN TVoucherDetails ON TVoucherEntry.PKVoucherNo = TVoucherDetails.FkVoucherNo ' +
+' INNER JOIN MVoucherType ON  TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode ' +
+' left join MPayType on MPayType.PKPayTypeNo=TVoucherEntry.paytypeno ' +
+' INNER JOIN  fn_Split ('''+(@PartyNo)+ ''','','' )As Party_BILL on TVoucherDetails.LedgerNo= CAST(Party_BILL.value AS numeric) '+  ' INNER JOIN MLedger ON MLedger.LedgerNo = CAST(Party_BILL.value AS numeric) ' +
+' WHERE TVoucherEntry.VoucherTypeCode not in(11,9,15,30,31,36,7,12,13) and TVoucherEntry.IsCancel=0 And TVoucherEntry.VoucherDate>= '''+cast(@FromDate as varchar)+'''and TVoucherEntry.VoucherDate<='''+cast(@ToDate as varchar)+''''
+--' ORDER BY TVoucherEntry.VoucherDate, TVoucherEntry.VoucherUserNo '
+end
+
+Exec(@StrQry)
+
+-- SELECT TVoucherEntry.PayTypeNo, TVoucherEntry.VoucherDate, TVoucherEntry.VoucherUserNo, TVoucherEntry.VoucherTypeCode, (SELECT  TVoucherDetails.Debit  AS Expr1) AS billamount, '' as PayTypeName,TVoucherEntry.VoucherDate AS recvDate,    (SELECT     TVoucherDetails.Credit  AS Expr1) AS recvamount,  (Select Case When TCC.ChequeNo<>'' Then TCC.ChequeNo  Else TCC.CreditCardNo End From TVoucherChqCreditDetails TCC Where TCC.FkVoucherNo=TVoucherEntry.PKVoucherno) ,   MLedger.LedgerName,MLedger.LedgerNo,   TVoucherEntry.Remark   AS Remark ,TVoucherEntry.NARRATION 
+-- from  TVoucherEntry INNER JOIN TVoucherDetails ON TVoucherEntry.PKVoucherNo = TVoucherDetails.FkVoucherNo  INNER JOIN MVoucherType ON  TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode  INNER JOIN  fn_Split ('252',',' )As Party_BILL on TVoucherDetails.LedgerNo= CAST(Party_BILL.value AS numeric)  INNER JOIN MLedger ON MLedger.LedgerNo = CAST(Party_BILL.value AS numeric)  WHERE TVoucherEntry.IsCancel=0 And TVoucherEntry.VoucherDate>= 'Apr  1 2018 12:00AM'and TVoucherEntry.VoucherDate<='Aug  1 2018 12:00AM' ORDER BY TVoucherEntry.VoucherDate, TVoucherEntry.VoucherUserNo 
+
+
+
+
+

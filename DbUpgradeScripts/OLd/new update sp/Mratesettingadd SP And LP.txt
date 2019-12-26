@@ -1,0 +1,5 @@
+ALTER TABLE dbo.MRateSetting ADD
+	SPPerc numeric(18, 2) NULL
+ALTER TABLE dbo.MRateSetting ADD
+	LPPerc numeric(18, 2) NULL
+update MRateSetting set LPPerc=0.0,SPPerc=0.0

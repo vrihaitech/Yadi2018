@@ -1,0 +1,113 @@
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+GO
+--Created on 01/04/2019
+ALTER PROCEDURE [dbo].[AddMRateSetting]
+     @PkSrNo                              numeric(18),
+   --  @FkBcdSrNo                           numeric(18),
+     @ItemNo                              numeric(18),
+     @FromDate                            datetime,
+     @PurRate                             numeric(18,4),
+     @MRP										numeric(18,4),
+	 @UOMNo                               numeric(18),
+	 @ASaleRate                            numeric(18,4),
+	 @BSaleRate                            numeric(18,4),
+	 @CSaleRate                            numeric(18,4),
+	 @DSaleRate                            numeric(18,4),
+	 @ESaleRate                            numeric(18,4),
+	 @StockConversion					  Numeric(18,2),
+	 @PerOfRateVariation				  numeric(18),
+     @MKTQty						      numeric(18),
+	 @IsActive								bit,
+	 @UserID                              numeric(18),
+     @UserDate                            datetime,
+	 @CompanyNo							  numeric(18)
+AS
+if(cast(@FromDate as datetime) < cast('02-02-1900 00:00:00' as datetime))
+begin
+	set @FromDate= getdate()
+end
+
+IF EXISTS(select PkSrNo from MRateSetting
+          where
+          PkSrNo = @PkSrNo)
+     BEGIN
+       --Update existing row
+       UPDATE MRateSetting
+       SET
+          --FkBcdSrNo = @FkBcdSrNo,
+          ItemNo = @ItemNo,
+          FromDate = @FromDate,
+          PurRate = @PurRate,
+          MRP=@MRP,
+		  UOMNo=@UOMNo,                               
+		  ASaleRate = @ASaleRate,
+		  BSaleRate = @BSaleRate,
+		  CSaleRate = @CSaleRate,
+		  DSaleRate = @DSaleRate,
+		  ESaleRate = @ESaleRate,
+		  StockConversion=@StockConversion,
+		  PerOfRateVariation=@PerOfRateVariation,
+		  MKTQty=@MKTQty,
+		  IsActive=@IsActive,
+          UserID = @UserID,
+          UserDate = @UserDate,
+		  CompanyNo=@CompanyNo,
+          StatusNo=2
+       WHERE
+          PkSrNo = @PkSrNo
+
+     END
+ELSE
+     BEGIN
+       --Insert new row
+       Declare @Id numeric
+       SELECT @Id=IsNull(Max(PkSrNo),0) From MRateSetting
+       DBCC CHECKIDENT('MRateSetting', RESEED, @Id)
+       INSERT INTO MRateSetting(
+         -- FkBcdSrNo,
+          ItemNo,
+          FromDate,
+          PurRate,
+		  MRP,
+		  UOMNo,
+		  ASaleRate,
+		  BSaleRate,
+		  CSaleRate,
+		  DSaleRate,
+		  ESaleRate,
+		  StockConversion,
+		  PerOfRateVariation,
+		  MKTQty,
+		  IsActive,
+          UserID,
+          UserDate,
+		  CompanyNo,
+          StatusNo
+)
+       VALUES(
+          --@FkBcdSrNo,
+          @ItemNo,
+          @FromDate,
+          @PurRate,
+		  @MRP,
+		  @UOMNo,
+          @ASaleRate,
+          @BSaleRate,
+          @CSaleRate,
+          @DSaleRate,
+          @ESaleRate,
+		  @StockConversion,
+		  @PerOfRateVariation,
+		  @MKTQty,
+		  @IsActive,
+          @UserID,
+          @UserDate,
+		  @CompanyNo,
+          1
+)
+
+END
+Update Mitemmaster set StatusNo=2 Where ItemNo =@ItemNo
+
+

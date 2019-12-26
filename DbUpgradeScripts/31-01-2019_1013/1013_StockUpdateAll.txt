@@ -1,0 +1,226 @@
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+GO
+--Created on umesh 30-10-2018
+ALTER PROCEDURE [dbo].[StockUpdateAll]
+
+AS---===========umesh 31-1-2019
+declare @Type numeric(18)
+
+
+
+--Select Cast(SettingValue as bit) from MSettings Where PKSettingNo=309
+
+Select  @Type=Cast(SettingValue as bit) from MSettings Where PKSettingNo=309
+
+--0 means post firmwise setting off
+--1 means post firmwise setting on
+update mratesetting set stock=0,stock2=0
+
+--Purchase 
+update m set m.stock =m.stock + t.qty from mratesetting m 
+inner join (select sum(tstock.billedquantity ) as qty,itemno from tstock 
+  INNER JOIN  TVoucherEntry ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+where  TVoucherEntry.vouchertypecode = 9 and TVoucherEntry.iscancel='false' and TStock.itype = 0
+group by itemno ) t
+on m.itemno=t.itemno 
+--sales return
+update m set m.stock =m.stock + t.qty from mratesetting m 
+inner join (select sum(tstock.billedquantity ) as qty,itemno from tstock 
+  INNER JOIN  TVoucherEntry ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+where  TVoucherEntry.vouchertypecode = 12 and TVoucherEntry.iscancel='false' and TStock.itype = 0
+group by itemno ) t
+on m.itemno=t.itemno 
+
+--sales
+update m set m.stock =m.stock - t.qty from mratesetting m 
+inner join (select sum(tstock.billedquantity ) as qty,itemno from tstock 
+  INNER JOIN TVoucherEntry ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+where  TVoucherEntry.vouchertypecode = 15 and TVoucherEntry.iscancel='false' and TStock.itype = 0
+group by itemno ) t
+on m.itemno=t.itemno 
+--Opening Stock
+update m set m.stock =m.stock + t.qty from mratesetting m 
+inner join (select CASE WHEN TStock.TrnCode=1 THEN sum(tstock.billedquantity )ELSE sum(tstock.billedquantity )*-1 END   as qty,itemno from tstock 
+  INNER JOIN TVoucherEntry ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+where  TVoucherEntry.vouchertypecode = 36 and TVoucherEntry.iscancel='false' and TStock.itype = 0
+group by itemno,TStock.TrnCode ) t
+on m.itemno=t.itemno 
+--Physical Stock
+update m set m.stock =m.stock + t.qty from mratesetting m 
+inner join (select CASE WHEN TStock.TrnCode=1 THEN sum(tstock.billedquantity )ELSE sum(tstock.billedquantity )*-1 END   as qty,itemno from tstock 
+  INNER JOIN TVoucherEntry ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+where  TVoucherEntry.vouchertypecode = 8 and TVoucherEntry.iscancel='false' and TStock.itype = 0
+group by itemno,TStock.TrnCode  ) t
+on m.itemno=t.itemno 
+
+--Production sales plus
+update m set m.stock =m.stock + t.qty from mratesetting m 
+inner join (
+select sum(MRecipeMain.ProdQty ) as qty,FinishItemID as itemno from MRecipeMain 
+where  MRecipeMain.RecipeType = 2 and MRecipeMain.IsActive='true' and MRecipeMain.ESFlag = 'false'
+group by FinishItemID 
+) t on m.itemno=t.itemno 
+
+--Production Rawsales plus
+update m set m.stock =m.stock - t.qty from mratesetting m 
+inner join (
+select sum(MRecipeSub.FinalQty ) as qty,RawProductID as itemno from MRecipeMain 
+ INNER JOIN  MRecipeSub ON MRecipeSub.FKMRecipeID = MRecipeMain.MRecipeID
+where  MRecipeMain.RecipeType = 2 and MRecipeMain.IsActive='true' and MRecipeMain.ESFlag = 'false'
+group by RawProductID 
+) t on m.itemno=t.itemno 
+
+
+if(@Type=1)
+begin
+--Estimate Purchase
+update m set m.stock2 =m.stock2 + t.qty from mratesetting m 
+inner join (select sum(tstock.billedquantity ) as qty,itemno from tstock 
+  INNER JOIN  TVoucherEntry ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+where  TVoucherEntry.vouchertypecode = 109 and TVoucherEntry.iscancel='false' and TStock.itype = 1
+group by itemno ) t
+on m.itemno=t.itemno 
+
+--Estimate purchase Return 
+update m set m.stock2 =m.stock2 - t.qty from mratesetting m 
+inner join (select sum(tstock.billedquantity ) as qty,itemno from tstock 
+  INNER JOIN TVoucherEntry ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+where  TVoucherEntry.vouchertypecode = 109 and TVoucherEntry.iscancel='false' and TStock.itype = 1
+group by itemno ) t
+on m.itemno=t.itemno 
+
+--Estimate Sales Return
+update m set m.stock2 =m.stock2 + t.qty from mratesetting m 
+inner join (select sum(tstock.billedquantity ) as qty,itemno from tstock 
+  INNER JOIN  TVoucherEntry ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+where  TVoucherEntry.vouchertypecode = 112 and TVoucherEntry.iscancel='false' and TStock.itype = 1
+group by itemno ) t
+on m.itemno=t.itemno 
+
+--Estimate Sales 
+update m set m.stock2 =m.stock2 - t.qty from mratesetting m 
+inner join (select sum(tstock.billedquantity ) as qty,itemno from tstock 
+  INNER JOIN TVoucherEntry ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+where  TVoucherEntry.vouchertypecode = 115 and TVoucherEntry.iscancel='false' and TStock.itype = 1
+group by itemno ) t
+on m.itemno=t.itemno 
+
+--Estimate Opening Stock
+update m set m.stock2 =m.stock2 + t.qty from mratesetting m 
+inner join (select sum(tstock.billedquantity ) as qty,itemno from tstock 
+  INNER JOIN TVoucherEntry ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+where  TVoucherEntry.vouchertypecode = 136 and TVoucherEntry.iscancel='false' and TStock.itype = 1
+group by itemno ) t
+on m.itemno=t.itemno 
+--Production estimate minus
+update m set m.stock2 =m.stock2 + t.qty from mratesetting m 
+inner join (
+select sum(MRecipeMain.ProdQty ) as qty,FinishItemID as itemno from MRecipeMain 
+where  MRecipeMain.RecipeType = 2 and MRecipeMain.IsActive='true' and MRecipeMain.ESFlag = 'true'
+group by FinishItemID 
+) t on m.itemno=t.itemno 
+
+--Production Raw Material estimate minus
+update m set m.stock2 =m.stock2 - t.qty from mratesetting m 
+inner join (
+select sum(MRecipeSub.FinalQty ) as qty,RawProductID as itemno from MRecipeMain 
+ INNER JOIN  MRecipeSub ON MRecipeSub.FKMRecipeID = MRecipeMain.MRecipeID
+where  MRecipeMain.RecipeType = 2 and MRecipeMain.IsActive='true' and MRecipeMain.ESFlag = 'true'
+group by RawProductID 
+) t on m.itemno=t.itemno 
+
+------------------------------------------------------missing entry
+update m set m.stock2 =m.stock2 - t.qty from mratesetting m 
+inner join (select sum(tstock.billedquantity ) as qty,itemno from tstock 
+  INNER JOIN TVoucherEntry ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+where  TVoucherEntry.vouchertypecode = 15 and TVoucherEntry.iscancel='false' and TStock.itype = 1
+group by itemno ) t
+on m.itemno=t.itemno 
+
+update m set m.stock2 =m.stock2 + t.qty from mratesetting m 
+inner join (select sum(tstock.billedquantity ) as qty,itemno from tstock 
+  INNER JOIN TVoucherEntry ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+where  TVoucherEntry.vouchertypecode = 12 and TVoucherEntry.iscancel='false' and TStock.itype = 1
+group by itemno ) t
+on m.itemno=t.itemno 
+
+update m set m.stock =m.stock + t.qty from mratesetting m 
+inner join (select sum(tstock.billedquantity ) as qty,itemno from tstock 
+  INNER JOIN TVoucherEntry ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+where  TVoucherEntry.vouchertypecode = 9 and TVoucherEntry.iscancel='false' and TStock.itype = 1
+group by itemno ) t
+on m.itemno=t.itemno 
+end
+
+-----------------------------------auto post off---------------------------------
+
+if(@Type=0)
+begin
+--Estimate Purchase
+update m set m.stock2 =m.stock2 + t.qty from mratesetting m 
+inner join (select sum(tstock.billedquantity ) as qty,itemno from tstock 
+  INNER JOIN  TVoucherEntry ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+where  TVoucherEntry.vouchertypecode = 109 and TVoucherEntry.iscancel='false' and TStock.itype = 0
+group by itemno ) t
+on m.itemno=t.itemno 
+--Estimate Sales Return
+update m set m.stock2 =m.stock2 + t.qty from mratesetting m 
+inner join (select sum(tstock.billedquantity ) as qty,itemno from tstock 
+  INNER JOIN  TVoucherEntry ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+where  TVoucherEntry.vouchertypecode = 112 and TVoucherEntry.iscancel='false' and TStock.itype = 0
+group by itemno ) t
+on m.itemno=t.itemno 
+
+--Estimate Sales 
+update m set m.stock2 =m.stock2 - t.qty from mratesetting m 
+inner join (select sum(tstock.billedquantity ) as qty,itemno from tstock 
+  INNER JOIN TVoucherEntry ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+where  TVoucherEntry.vouchertypecode = 115 and TVoucherEntry.iscancel='false' and TStock.itype = 0
+group by itemno ) t
+on m.itemno=t.itemno 
+
+--Estimate Opening Stock
+update m set m.stock2 =m.stock2 + t.qty from mratesetting m 
+inner join (select sum(tstock.billedquantity ) as qty,itemno from tstock 
+  INNER JOIN TVoucherEntry ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+where  TVoucherEntry.vouchertypecode = 136 and TVoucherEntry.iscancel='false' and TStock.itype = 0
+group by itemno ) t
+on m.itemno=t.itemno 
+
+
+--Estimate physical Stock
+update m set m.stock2 =m.stock2 - t.qty from mratesetting m 
+inner join (select sum(tstock.billedquantity ) as qty,itemno from tstock 
+  INNER JOIN TVoucherEntry ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+where  TVoucherEntry.vouchertypecode = 108 and TVoucherEntry.iscancel='false' and TStock.itype = 0
+group by itemno ) t
+on m.itemno=t.itemno 
+
+--Estimate purchase return 
+update m set m.stock2 =m.stock2 - t.qty from mratesetting m 
+inner join (select sum(tstock.billedquantity ) as qty,itemno from tstock 
+  INNER JOIN TVoucherEntry ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+where  TVoucherEntry.vouchertypecode = 113 and TVoucherEntry.iscancel='false' and TStock.itype = 0
+group by itemno ) t
+on m.itemno=t.itemno
+end 
+
+
+--Production estimate minus
+update m set m.stock2 =m.stock2 + t.qty from mratesetting m 
+inner join (
+select sum(MRecipeMain.ProdQty ) as qty,FinishItemID as itemno from MRecipeMain 
+where  MRecipeMain.RecipeType = 2 and MRecipeMain.IsActive='true' and MRecipeMain.ESFlag = 'true'
+group by FinishItemID 
+) t on m.itemno=t.itemno 
+
+--Production Raw Material estimate minus
+update m set m.stock2 =m.stock2 - t.qty from mratesetting m 
+inner join (
+select sum(MRecipeSub.FinalQty ) as qty,RawProductID as itemno from MRecipeMain 
+ INNER JOIN  MRecipeSub ON MRecipeSub.FKMRecipeID = MRecipeMain.MRecipeID
+where  MRecipeMain.RecipeType = 2 and MRecipeMain.IsActive='true' and MRecipeMain.ESFlag = 'true'
+group by RawProductID 
+) t on m.itemno=t.itemno 
+

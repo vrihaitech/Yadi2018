@@ -1,0 +1,115 @@
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[AddMRecipeMain]
+ @MRecipeID                  int,
+ @DocNo                      int,
+ @GroupNo                    int,
+ @FinishItemID               int,
+ @PackingSize                decimal(18,2), 
+ @RDate                      datetime,
+ @Qty                        numeric(18,2), 
+ @UomNo                      numeric(18,0),
+ @RecipeType                 numeric(18,0),
+ @IsActive                   bit, 
+ @UserID                     int,
+ @UserDate                   datetime,
+ @ProdQty                    numeric(18,2),
+ @FkRecipeID                 numeric(18,2),
+ @IsLock                     bit,
+ @ESFlag                     bit, 
+ @ReturnID                   int output
+
+AS
+IF EXISTS(select MRecipeID from MRecipeMain
+          where
+          MRecipeID = @MRecipeID and RecipeType=@RecipeType)
+     BEGIN
+       --Update existing row
+       UPDATE MRecipeMain
+       SET
+        DocNo=@DocNo,
+		GroupNo=@GroupNo,
+		FinishItemID=@FinishItemID,
+		PackingSize=@PackingSize,
+		RDate=@RDate,
+        Qty=@Qty,
+        ProdQty=@ProdQty,
+        UomNo=@UomNo,
+        RecipeType=@RecipeType,
+        FkRecipeID=@FkRecipeID,
+        IsLock=@IsLock,
+		IsActive=@IsActive,
+        ESFlag=@ESFlag,
+		UserID=@UserID,
+        ModifiedOn = isnull(ModifiedOn,'') + cast(@UserID as varchar)+'@'+ CONVERT(VARCHAR(10), GETDATE(), 105)
+
+       WHERE
+          MRecipeID = @MRecipeID and RecipeType=@RecipeType
+		set @ReturnID=@MRecipeID 
+
+     END
+ELSE
+     BEGIN
+       --Insert new row
+       Declare @Id numeric
+  SELECT @Id=IsNull(Max(MRecipeID),0) From MRecipeMain
+       DBCC CHECKIDENT('MRecipeMain', RESEED, @Id)
+       SELECT @DocNo=IsNull(Max(DocNo),0)+1 From MRecipeMain where RecipeType=@RecipeType and ESFlag=@ESFlag
+     
+       INSERT INTO MRecipeMain(
+        DocNo,
+		GroupNo,
+		FinishItemID, 
+		PackingSize, 
+		RDate, 
+        Qty,
+        ProdQty,
+        UomNo,
+        RecipeType,
+        FkRecipeID,
+        IsLock,
+		IsActive,
+        ESFlag, 
+		UserID, 
+		UserDate
+         
+)
+       VALUES(
+         
+		@DocNo,
+		@GroupNo, 
+		@FinishItemID, 
+		@PackingSize, 
+		@RDate,
+        @Qty, 
+        @ProdQty,
+        @UomNo,
+        @RecipeType,
+        @FkRecipeID,
+        @IsLock,
+		@IsActive, 
+        @ESFlag,
+		@UserID,
+        @UserDate         
+)
+Set @ReturnID=Scope_Identity()
+END
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

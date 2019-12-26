@@ -1,0 +1,36 @@
+Exec GetCollectionDetails 18312,109,1
+
+SELECT     vouchertypecode,voucheruserno,Billedamount,TVoucherDetails.*
+FROM         TVoucherEntry INNER JOIN
+                      TVoucherDetails ON TVoucherEntry.PkVoucherNo = TVoucherDetails.FkVoucherNo
+where TVoucherDetails.ledgerno=18312 and iscancel='false' 
+and vouchertypecode=109
+and pkvouchertrnno not in (select Fkvouchertrnno from tvoucherrefdetails)
+ order by vouchertypecode
+
+select * from tvoucherrefdetails where ledgerno=18312 order by typeofref
+delete from TVoucherRefDetails 
+where TypeOfRef in (2,5) and fkvouchersrno=0
+
+
+select * from tvoucherentry where pkvoucherno=7832
+select * from tvoucherdetails where fkvoucherno=125
+select * from tvoucherrefdetails where fkvouchertrnno=458
+
+select * from tvoucherdetails where pkvouchertrnno=26624
+
+select * from mledger where ledgerno=
+select * from mledger where ledgerno=18312
+exec SetMisMatchVoucher 3
+exec SetMisMatchVoucher 2
+exec SetMisMatchVoucherP 5
+
+
+==================
+select * from mitemmaster where barcode='16608'
+
+select sum(quantity),trncode from tstock where itemno=53538 group by trncode
+select * from tvoucherentry where pkvoucherno in 
+(select Fkvoucherno from tstock where itemno=53538 )
+
+select * from tstock where itemno=53538 

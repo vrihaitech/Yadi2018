@@ -1,0 +1,238 @@
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[GetPayTypeDetails]
+@FromDate			 datetime,
+@ToDate				 datetime,
+@VchType			 numeric(18),
+@RType				numeric(18),
+@CompanyNo			numeric(18)
+AS
+Declare @Details TABLE (PayTypeNo numeric(18,0),PayTypeName Varchar(500),PayTypeActName varchar(200),PayTypeShortName varchar(20),Amount numeric(18,2),NoOfBills numeric(18),typeno numeric(18))
+Declare @PayTypeNo numeric(18,0),@PayTypeName Varchar(500),@Amount numeric(18,2),@NoOfBills numeric(18),
+		@PayTypeActName varchar(200),@ShortName varchar(20),@MixAmt numeric(18,2),@TotAmt numeric(18,2),
+		@TAmount numeric(18,2),@MAmount numeric(18,2),@VchStr numeric(18)
+set @VchStr=0
+
+if(@VchType=15)
+begin
+set @VchStr=12
+Declare CurDtls Cursor  for SELECT PKPayTypeNo, PayTypeName +' ('+ShortName+')',PayTypeName,ShortName
+							FROM MPayType 
+							WHERE  PKPayTypeNo<>1
+							Union 
+							SELECT 12000,'Mix Mode(MX)','Mix Mode','MX'
+
+end
+else if(@VchType=115)
+begin
+set @VchStr=112
+Declare CurDtls Cursor  for SELECT PKPayTypeNo, PayTypeName +' ('+ShortName+')',PayTypeName,ShortName
+							FROM MPayType 
+							WHERE  PKPayTypeNo<>1
+							Union 
+							SELECT 12000,'Mix Mode(MX)','Mix Mode','MX'
+
+end
+else if(@VchType=9)
+begin
+set @VchStr=13
+Declare CurDtls Cursor  for SELECT PKPayTypeNo, PayTypeName +' ('+ShortName+')',PayTypeName,ShortName
+							FROM MPayType 
+							WHERE  PKPayTypeNo<>1
+end
+else if(@VchType=109)
+begin
+set @VchStr=113
+Declare CurDtls Cursor  for SELECT PKPayTypeNo, PayTypeName +' ('+ShortName+')',PayTypeName,ShortName
+							FROM MPayType 
+							WHERE  PKPayTypeNo<>1
+end
+else if (@VchType=12 or @VchType=13 or @VchType=113 or @VchType=112)
+Begin
+set @VchStr=@VchType 
+Declare CurDtls Cursor  for SELECT PKPayTypeNo, PayTypeName +' ('+ShortName+')',PayTypeName,ShortName
+							FROM MPayType 
+							WHERE  PKPayTypeNo NOT IN (1,4,5,6,7)
+end
+	Open CurDtls	
+	Fetch Next From CurDtls into @PayTypeNo ,@PayTypeName,@PayTypeActName,@ShortName
+
+	while(@@Fetch_Status = 0)
+	begin
+	if(@RType=0)
+	Begin
+		if(@PayTypeNo <>12000)
+		Begin
+		Select @TAmount=ISNull(SUM(case when TVoucherEntry.voucherTypecode in (15,9) then isNull((Debit+Credit),0) else isNull((Debit+Credit),0)*-1 end), 0),@NoOfBills=Count(*) FROM TVoucherEntry INNER JOIN
+					   TVoucherDetails ON TVoucherEntry.PkVoucherNo = TVoucherDetails.FkVoucherNo INNER JOIN
+                       MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo
+                       WHERE (TVoucherDetails.SrNo=501) AND (TVoucherEntry.PayTypeNo = @PayTypeNo) 
+					   AND TVoucherEntry.VoucherDate>=@FromDate and  TVoucherEntry.VoucherDate<=@ToDate 
+					   AND TVoucherEntry.VoucherTypeCode in(@VchType,@VchStr) and TVoucherEntry.CompanyNo=@CompanyNo
+					   AND TVoucherEntry.IsCancel='false' AND MIXMode=0
+--		SELECT @MAmount= IsNull(SUM(TVoucherRefDetails.Amount),0) FROM TVoucherEntry INNER JOIN TVoucherDetails ON TVoucherDetails.FkVoucherNo = TVoucherEntry.PkVoucherNo INNER JOIN
+--						TVoucherRefDetails ON TVoucherDetails.PkVoucherTrnNo = TVoucherRefDetails.FkVoucherTrnNo INNER JOIN MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo
+--						WHERE  (TVoucherEntry.VoucherTypeCode = 30) AND (TVoucherEntry.CompanyNo = @CompanyNo) AND 
+--						(TVoucherRefDetails.RefNo IN (SELECT RefNo FROM TVoucherRefDetails AS TVoucherRefDetails_1 WHERE (FkVoucherTrnNo IN (SELECT PkVoucherTrnNo FROM TVoucherDetails AS TVoucherDetails_1
+--						WHERE (FkVoucherNo IN  (SELECT PkVoucherNo FROM TVoucherEntry AS TVoucherEntry_1 WHERE (PayTypeNo = 3) AND (VoucherDate >= @FromDate) AND (VoucherDate <= @ToDate) 
+--						AND (VoucherTypeCode = @VchType) AND  TVoucherEntry.IsCancel = 'false'  AND (CompanyNo = @CompanyNo) AND (MixMode = 1))) AND (VoucherSrNo = 1))))) and MPayType.PKPayTypeNo=@PayTypeNo
+
+				SELECT    @MAmount=IsNull(SUM(TVoucherRefDetails.Amount),0) 
+				FROM         TVoucherEntry INNER JOIN
+									  TVoucherDetails ON TVoucherDetails.FkVoucherNo = TVoucherEntry.PkVoucherNo INNER JOIN
+									  TVoucherRefDetails ON TVoucherDetails.PkVoucherTrnNo = TVoucherRefDetails.FkVoucherTrnNo INNER JOIN
+									  MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo INNER JOIN
+									  TVoucherPayTypeDetails ON TVoucherEntry.PkVoucherNo = TVoucherPayTypeDetails.FKReceiptVoucherNo
+				WHERE      (TVoucherEntry.VoucherTypeCode = case when @VchType=15 then 30 else 31 end) and (TVoucherEntry .CompanyNo = @CompanyNo) and MPayType.PKPayTypeNo=@PayTypeNo 
+				AND (VoucherDate >= @FromDate) AND (VoucherDate <= @ToDate) AND  TVoucherEntry.IsCancel = 'false'
+						
+		set @Amount=@TAmount+@MAmount
+		end
+		else 
+		Select @Amount=ISNull(SUM(Debit+Credit), 0),@NoOfBills=Count(*) FROM TVoucherEntry INNER JOIN
+					   TVoucherDetails ON TVoucherEntry.PkVoucherNo = TVoucherDetails.FkVoucherNo INNER JOIN
+                       MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo
+                       WHERE (TVoucherDetails.SrNo=501) AND (TVoucherEntry.PayTypeNo = 3) 
+					   AND TVoucherEntry.VoucherDate>=@FromDate and  TVoucherEntry.VoucherDate<=@ToDate 
+					   AND TVoucherEntry.VoucherTypeCode=@VchType and TVoucherEntry.CompanyNo=@CompanyNo
+					   AND TVoucherEntry.IsCancel='false' AND MIXMode=1
+	End
+	if(@RType=1)		
+	BEgin
+		if(@PayTypeNo <>12000)
+		Begin
+		Select @TAmount=ISNull(SUM(case when TVoucherEntry.voucherTypecode in (15,9) then isNull((Debit+Credit),0) else isNull((Debit+Credit),0)*-1 end), 0),@NoOfBills=Count(*) FROM TVoucherEntry INNER JOIN
+                       TVoucherDetails ON TVoucherEntry.PkVoucherNo = TVoucherDetails.FkVoucherNo INNER JOIN
+                       MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo
+                       WHERE (TVoucherDetails.SrNo=501) AND (TVoucherEntry.PayTypeNo = @PayTypeNo) 
+					   AND TVoucherEntry.VoucherDate>=@FromDate and  TVoucherEntry.VoucherDate<=@ToDate 
+					   AND TVoucherEntry.VoucherTypeCode in(@VchType,@VchStr) and TVoucherEntry.CompanyNo=@CompanyNo
+					   AND TVoucherEntry.IsCancel='true' AND MIXMode=0
+
+--		SELECT  @MAmount=IsNull(SUM(TVoucherRefDetails.Amount),0) FROM TVoucherEntry INNER JOIN TVoucherDetails ON TVoucherDetails.FkVoucherNo = TVoucherEntry.PkVoucherNo INNER JOIN
+--						TVoucherRefDetails ON TVoucherDetails.PkVoucherTrnNo = TVoucherRefDetails.FkVoucherTrnNo INNER JOIN MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo
+--						WHERE  (TVoucherEntry.VoucherTypeCode = 30) AND (TVoucherEntry.CompanyNo = @CompanyNo) AND 
+--						(TVoucherRefDetails.RefNo IN (SELECT RefNo FROM TVoucherRefDetails AS TVoucherRefDetails_1 WHERE (FkVoucherTrnNo IN (SELECT PkVoucherTrnNo FROM TVoucherDetails AS TVoucherDetails_1
+--						WHERE (FkVoucherNo IN  (SELECT PkVoucherNo FROM TVoucherEntry AS TVoucherEntry_1 WHERE (PayTypeNo = 3) AND (VoucherDate >= @FromDate) AND (VoucherDate <= @ToDate) 
+--						AND (VoucherTypeCode = @VchType) AND  TVoucherEntry.IsCancel = 'true'  AND (CompanyNo = @CompanyNo) AND (MixMode = 1))) AND (VoucherSrNo = 1))))) and MPayType.PKPayTypeNo=@PayTypeNo
+SELECT    @MAmount=IsNull(SUM(TVoucherRefDetails.Amount),0) 
+				FROM         TVoucherEntry INNER JOIN
+									  TVoucherDetails ON TVoucherDetails.FkVoucherNo = TVoucherEntry.PkVoucherNo INNER JOIN
+									  TVoucherRefDetails ON TVoucherDetails.PkVoucherTrnNo = TVoucherRefDetails.FkVoucherTrnNo INNER JOIN
+									  MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo INNER JOIN
+									  TVoucherPayTypeDetails ON TVoucherEntry.PkVoucherNo = TVoucherPayTypeDetails.FKReceiptVoucherNo
+				WHERE      (TVoucherEntry.VoucherTypeCode = 30) and (TVoucherEntry .CompanyNo = @CompanyNo) and MPayType.PKPayTypeNo=@PayTypeNo 
+				AND (VoucherDate >= @FromDate) AND (VoucherDate <= @ToDate) AND  TVoucherEntry.IsCancel = 'true'
+		set @Amount=@TAmount+@MAmount
+		end
+		else 
+		Select @Amount=ISNull(SUM(Debit+Credit), 0),@NoOfBills=Count(*) FROM TVoucherEntry INNER JOIN
+                       TVoucherDetails ON TVoucherEntry.PkVoucherNo = TVoucherDetails.FkVoucherNo INNER JOIN
+                       MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo
+                       WHERE (TVoucherDetails.SrNo=501) AND (TVoucherEntry.PayTypeNo = 3) 
+					   AND TVoucherEntry.VoucherDate>=@FromDate and  TVoucherEntry.VoucherDate<=@ToDate 
+					   AND TVoucherEntry.VoucherTypeCode=@VchType and TVoucherEntry.CompanyNo=@CompanyNo
+					   AND TVoucherEntry.IsCancel='true' AND MIXMode=1
+	End
+	if(@RType=2)
+	Begin
+		if(@PayTypeNo <>12000)
+		Begin
+		Select @TAmount=ISNull(SUM(case when TVoucherEntry.voucherTypecode in (15,9) then isNull((Debit+Credit),0) else isNull((Debit+Credit),0)*-1 end), 0),@NoOfBills=Count(*) FROM TVoucherEntry INNER JOIN
+                       TVoucherDetails ON TVoucherEntry.PkVoucherNo = TVoucherDetails.FkVoucherNo INNER JOIN
+                       MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo
+                       WHERE(TVoucherDetails.SrNo=501) AND (TVoucherEntry.PayTypeNo = @PayTypeNo) 
+					   AND TVoucherEntry.VoucherDate>=@FromDate and  TVoucherEntry.VoucherDate<=@ToDate 
+					   AND TVoucherEntry.VoucherTypeCode in(@VchType,@VchStr) and TVoucherEntry.CompanyNo=@CompanyNo  --AND MIXMode=0
+		
+--		SELECT  @MAmount= isNull(SUM(TVoucherRefDetails.Amount),0) FROM TVoucherEntry INNER JOIN TVoucherDetails ON TVoucherDetails.FkVoucherNo = TVoucherEntry.PkVoucherNo INNER JOIN
+--						TVoucherRefDetails ON TVoucherDetails.PkVoucherTrnNo = TVoucherRefDetails.FkVoucherTrnNo INNER JOIN MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo
+--						WHERE  (TVoucherEntry.VoucherTypeCode = 30) AND (TVoucherEntry.CompanyNo = @CompanyNo) AND 
+--						(TVoucherRefDetails.RefNo IN (SELECT RefNo FROM TVoucherRefDetails AS TVoucherRefDetails_1 WHERE (FkVoucherTrnNo IN (SELECT PkVoucherTrnNo FROM TVoucherDetails AS TVoucherDetails_1
+--						WHERE (FkVoucherNo IN  (SELECT PkVoucherNo FROM TVoucherEntry AS TVoucherEntry_1 WHERE (PayTypeNo = 3) AND (VoucherDate >= @FromDate) AND (VoucherDate <= @ToDate) 
+--						AND (VoucherTypeCode = 15)  AND (CompanyNo = @CompanyNo) AND (MixMode = 1))) AND (VoucherSrNo = 1))))) and MPayType.PKPayTypeNo=@PayTypeNo
+
+SELECT    @MAmount=IsNull(SUM(TVoucherRefDetails.Amount),0) 
+				FROM         TVoucherEntry INNER JOIN
+									  TVoucherDetails ON TVoucherDetails.FkVoucherNo = TVoucherEntry.PkVoucherNo INNER JOIN
+									  TVoucherRefDetails ON TVoucherDetails.PkVoucherTrnNo = TVoucherRefDetails.FkVoucherTrnNo INNER JOIN
+									  MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo INNER JOIN
+									  TVoucherPayTypeDetails ON TVoucherEntry.PkVoucherNo = TVoucherPayTypeDetails.FKReceiptVoucherNo
+				WHERE      (TVoucherEntry.VoucherTypeCode = 30) and (TVoucherEntry .CompanyNo = @CompanyNo) and MPayType.PKPayTypeNo=@PayTypeNo 
+				AND (VoucherDate >= @FromDate) AND (VoucherDate <= @ToDate) 
+		set @Amount=@TAmount+@MAmount
+		end
+		else
+		Select @Amount=ISNull(SUM(Debit+Credit), 0),@NoOfBills=Count(*) FROM TVoucherEntry INNER JOIN
+                       TVoucherDetails ON TVoucherEntry.PkVoucherNo = TVoucherDetails.FkVoucherNo INNER JOIN
+                       MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo
+                       WHERE(TVoucherDetails.SrNo=501) AND (TVoucherEntry.PayTypeNo = 3) 
+					   AND TVoucherEntry.VoucherDate>=@FromDate and  TVoucherEntry.VoucherDate<=@ToDate 
+					   AND TVoucherEntry.VoucherTypeCode=@VchType and TVoucherEntry.CompanyNo=@CompanyNo -- AND MIXMode=1
+	End			  
+	insert into @Details values(@PayTypeNo ,@PayTypeName,@PayTypeActName,@ShortName,@Amount,@NoOfBills,1)
+	if(@PayTypeNo=12000)
+	Begin
+			set @MixAmt=@Amount
+			set @TotAmt=0
+		if(@RType=0)
+--		Declare CurMix Cursor For SELECT  MPayType.PKPayTypeNo,MPayType.PayTypeName AS Name,MPayType.DisplayName,MPayType.ShortName, SUM(TVoucherRefDetails.Amount) AS Amount FROM TVoucherEntry INNER JOIN TVoucherDetails ON TVoucherDetails.FkVoucherNo = TVoucherEntry.PkVoucherNo INNER JOIN
+--						TVoucherRefDetails ON TVoucherDetails.PkVoucherTrnNo = TVoucherRefDetails.FkVoucherTrnNo INNER JOIN MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo
+--						WHERE  (TVoucherEntry.VoucherTypeCode = 30) AND (TVoucherEntry.CompanyNo = @CompanyNo) AND 
+--						(TVoucherRefDetails.RefNo IN (SELECT RefNo FROM TVoucherRefDetails AS TVoucherRefDetails_1 WHERE (FkVoucherTrnNo IN (SELECT PkVoucherTrnNo FROM TVoucherDetails AS TVoucherDetails_1
+--						WHERE (FkVoucherNo IN  (SELECT PkVoucherNo FROM TVoucherEntry AS TVoucherEntry_1 WHERE (PayTypeNo = 3) AND (VoucherDate >= @FromDate) AND (VoucherDate <= @ToDate) 
+--						AND (VoucherTypeCode = 15) AND  TVoucherEntry.IsCancel = 'false'  AND (CompanyNo = @CompanyNo) AND (MixMode = 1))) AND (VoucherSrNo = 1)))))
+--						GROUP BY MPayType.PKPayTypeNo, MPayType.PayTypeName,MPayType.DisplayName,MPayType.ShortName
+Declare CurMix Cursor for SELECT MPayType.PKPayTypeNo,MPayType.PayTypeName AS Name,MPayType.DisplayName,MPayType.ShortName, SUM(TVoucherRefDetails.Amount) AS Amount FROM TVoucherEntry INNER JOIN  TVoucherDetails ON TVoucherDetails.FkVoucherNo = TVoucherEntry.PkVoucherNo INNER JOIN TVoucherRefDetails ON TVoucherDetails.PkVoucherTrnNo = TVoucherRefDetails.FkVoucherTrnNo INNER JOIN  MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo INNER JOIN  TVoucherPayTypeDetails ON TVoucherEntry.PkVoucherNo = TVoucherPayTypeDetails.FKReceiptVoucherNo WHERE  (TVoucherEntry.VoucherTypeCode = 30) AND (TVoucherRefDetails.RefNo in (SELECT RefNo FROM TVoucherRefDetails AS TVoucherRefDetails_1 WHERE (FkVoucherTrnNo IN (SELECT PkVoucherTrnNo FROM TVoucherDetails AS TVoucherDetails_1
+						WHERE (FkVoucherNo IN  (SELECT PkVoucherNo FROM TVoucherEntry AS TVoucherEntry_1 WHERE (PayTypeNo = 3) AND (VoucherDate >= @FromDate) AND (VoucherDate <= @ToDate) 
+						AND (VoucherTypeCode = @VchType) AND  TVoucherEntry.IsCancel = 'false'  AND (CompanyNo = @CompanyNo) AND (MixMode = 1))) AND (VoucherSrNo = 1))))) AND (TVoucherEntry.CompanyNo = @CompanyNo)  
+GROUP BY MPayType.PKPayTypeNo, MPayType.PayTypeName,MPayType.DisplayName,MPayType.ShortName
+	if(@RType=1)
+--		Declare CurMix Cursor For SELECT  MPayType.PKPayTypeNo,MPayType.PayTypeName AS Name,MPayType.DisplayName,MPayType.ShortName, SUM(TVoucherRefDetails.Amount) AS Amount FROM TVoucherEntry INNER JOIN TVoucherDetails ON TVoucherDetails.FkVoucherNo = TVoucherEntry.PkVoucherNo INNER JOIN
+--						TVoucherRefDetails ON TVoucherDetails.PkVoucherTrnNo = TVoucherRefDetails.FkVoucherTrnNo INNER JOIN MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo
+--						WHERE  (TVoucherEntry.VoucherTypeCode = 30) AND (TVoucherEntry.CompanyNo = @CompanyNo) AND 
+--						(TVoucherRefDetails.RefNo IN (SELECT RefNo FROM TVoucherRefDetails AS TVoucherRefDetails_1 WHERE (FkVoucherTrnNo IN (SELECT PkVoucherTrnNo FROM TVoucherDetails AS TVoucherDetails_1
+--						WHERE (FkVoucherNo IN  (SELECT PkVoucherNo FROM TVoucherEntry AS TVoucherEntry_1 WHERE (PayTypeNo = 3) AND (VoucherDate >= @FromDate) AND (VoucherDate <= @ToDate) 
+--						AND (VoucherTypeCode = 15) AND  TVoucherEntry.IsCancel = 'true'  AND (CompanyNo = @CompanyNo) AND (MixMode = 1))) AND (VoucherSrNo = 1)))))
+--						GROUP BY MPayType.PKPayTypeNo, MPayType.PayTypeName,MPayType.DisplayName,MPayType.ShortName
+Declare CurMix Cursor for SELECT MPayType.PKPayTypeNo,MPayType.PayTypeName AS Name,MPayType.DisplayName,MPayType.ShortName, SUM(TVoucherRefDetails.Amount) AS Amount FROM TVoucherEntry INNER JOIN  TVoucherDetails ON TVoucherDetails.FkVoucherNo = TVoucherEntry.PkVoucherNo INNER JOIN TVoucherRefDetails ON TVoucherDetails.PkVoucherTrnNo = TVoucherRefDetails.FkVoucherTrnNo INNER JOIN  MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo INNER JOIN  TVoucherPayTypeDetails ON TVoucherEntry.PkVoucherNo = TVoucherPayTypeDetails.FKReceiptVoucherNo WHERE  (TVoucherEntry.VoucherTypeCode = 30) AND (TVoucherRefDetails.RefNo in (SELECT RefNo FROM TVoucherRefDetails AS TVoucherRefDetails_1 WHERE (FkVoucherTrnNo IN (SELECT PkVoucherTrnNo FROM TVoucherDetails AS TVoucherDetails_1
+						WHERE (FkVoucherNo IN  (SELECT PkVoucherNo FROM TVoucherEntry AS TVoucherEntry_1 WHERE (PayTypeNo = 3) AND (VoucherDate >= @FromDate) AND (VoucherDate <= @ToDate) 
+						AND (VoucherTypeCode = @VchType) AND  TVoucherEntry.IsCancel = 'true'  AND (CompanyNo = @CompanyNo) AND (MixMode = 1))) AND (VoucherSrNo = 1))))) AND (TVoucherEntry.CompanyNo = @CompanyNo)  
+GROUP BY MPayType.PKPayTypeNo, MPayType.PayTypeName,MPayType.DisplayName,MPayType.ShortName
+    if(@RType=2)
+--		Declare CurMix Cursor For SELECT  MPayType.PKPayTypeNo,MPayType.PayTypeName AS Name,MPayType.DisplayName,MPayType.ShortName, SUM(TVoucherRefDetails.Amount) AS Amount FROM TVoucherEntry INNER JOIN TVoucherDetails ON TVoucherDetails.FkVoucherNo = TVoucherEntry.PkVoucherNo INNER JOIN
+--						TVoucherRefDetails ON TVoucherDetails.PkVoucherTrnNo = TVoucherRefDetails.FkVoucherTrnNo INNER JOIN MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo
+--						WHERE  (TVoucherEntry.VoucherTypeCode = 30) AND (TVoucherEntry.CompanyNo = @CompanyNo) AND 
+--						(TVoucherRefDetails.RefNo IN (SELECT RefNo FROM TVoucherRefDetails AS TVoucherRefDetails_1 WHERE (FkVoucherTrnNo IN (SELECT PkVoucherTrnNo FROM TVoucherDetails AS TVoucherDetails_1
+--						WHERE (FkVoucherNo IN  (SELECT PkVoucherNo FROM TVoucherEntry AS TVoucherEntry_1 WHERE (PayTypeNo = 3) AND (VoucherDate >= @FromDate) AND (VoucherDate <= @ToDate) 
+--						AND (VoucherTypeCode = 15)  AND (CompanyNo = @CompanyNo) AND (MixMode = 1))) AND (VoucherSrNo = 1)))))
+--						GROUP BY MPayType.PKPayTypeNo, MPayType.PayTypeName,MPayType.DisplayName,MPayType.ShortName
+Declare CurMix Cursor for SELECT MPayType.PKPayTypeNo,MPayType.PayTypeName AS Name,MPayType.DisplayName,MPayType.ShortName, SUM(TVoucherRefDetails.Amount) AS Amount FROM TVoucherEntry INNER JOIN  TVoucherDetails ON TVoucherDetails.FkVoucherNo = TVoucherEntry.PkVoucherNo INNER JOIN TVoucherRefDetails ON TVoucherDetails.PkVoucherTrnNo = TVoucherRefDetails.FkVoucherTrnNo INNER JOIN  MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo INNER JOIN  TVoucherPayTypeDetails ON TVoucherEntry.PkVoucherNo = TVoucherPayTypeDetails.FKReceiptVoucherNo WHERE  (TVoucherEntry.VoucherTypeCode = 30) AND (TVoucherRefDetails.RefNo in (SELECT RefNo FROM TVoucherRefDetails AS TVoucherRefDetails_1 WHERE (FkVoucherTrnNo IN (SELECT PkVoucherTrnNo FROM TVoucherDetails AS TVoucherDetails_1
+						WHERE (FkVoucherNo IN  (SELECT PkVoucherNo FROM TVoucherEntry AS TVoucherEntry_1 WHERE (PayTypeNo = 3) AND (VoucherDate >= @FromDate) AND (VoucherDate <= @ToDate) 
+						AND (VoucherTypeCode = @VchType)  AND (CompanyNo = @CompanyNo) AND (MixMode = 1))) AND (VoucherSrNo = 1))))) AND (TVoucherEntry.CompanyNo = @CompanyNo)  
+GROUP BY MPayType.PKPayTypeNo, MPayType.PayTypeName,MPayType.DisplayName,MPayType.ShortName
+
+
+		Open CurMix
+		Fetch Next From CurMix Into @PayTypeNo,@PayTypeName,@PayTypeActName,@ShortName,@Amount
+		While(@@Fetch_Status = 0)
+		Begin
+			--insert into @Details values(0 ,@PayTypeName,@PayTypeActName,@ShortName,@Amount,0,2)
+			set @TotAmt=@TotAmt+@Amount
+			Fetch Next From CurMix Into @PayTypeNo,@PayTypeName,@PayTypeActName,@ShortName,@Amount
+		End
+		Close CurMix Deallocate CurMix
+		set @TotAmt=@MixAmt-@TotAmt
+--		if(@TotAmt<>0)
+--			insert into @Details values(0 ,'Pending','Pending','PP',@TotAmt,0,2)
+	End
+	Fetch Next From CurDtls into @PayTypeNo ,@PayTypeName,@PayTypeActName,@ShortName
+	end
+Close CurDtls Deallocate CurDtls
+if(@TotAmt<>0)
+update @Details set Amount=Amount+@TotAmt where PayTypeNo=3
+delete from @Details where PayTypeNo=12000
+Select PayTypeNo ,PayTypeName ,PayTypeActName ,PayTypeShortName ,abs(Amount) AS Amount ,NoOfBills ,typeno from @Details
+
+

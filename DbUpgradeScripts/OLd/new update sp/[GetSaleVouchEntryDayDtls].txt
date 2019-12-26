@@ -1,0 +1,184 @@
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[GetSaleVouchEntryDayDtls]
+@VchNo int,
+@CompNo numeric(18),
+@FrDate datetime,
+@ToDate datetime,
+@Type numeric(18),
+@Temp numeric(18)
+
+
+AS
+
+Declare @TVchNo numeric(18)
+
+if(@VchNo=15)
+set @TVchNo=12
+else if(@VchNo=115)
+set @TVchNo=112
+else if(@VchNo=109)
+set @TVchNo=113
+else if(@VchNo=9)
+set @TVchNo=13
+else if(@VchNo=12 or @VchNo=13 or @VchNo=113 or @VchNo=112)
+begin
+set @TVchNo=@VchNo
+set @VchNo=-1
+end
+
+Begin
+if(@Type=1)
+Begin
+
+SELECT DISTINCT TVoucherEntry.VoucherDate as Date ,                          
+                          (SELECT     LedgerName
+                            FROM          MLedger
+                            WHERE      (LedgerNo = TVoucherDetails_1.LedgerNo)) AS Party,
+			  MVoucherType.VoucherTypeName,
+			  (Select count(*)  from TVoucherEntry INNER JOIN
+                      TVoucherDetails ON TVoucherEntry.PkVoucherNo = TVoucherDetails.FkVoucherNo
+				WHERE (TVoucherEntry.VoucherTypeCode  in (@VchNo)) AND  (TVoucherEntry.VoucherDate >= @FrDate) AND 
+				(TVoucherEntry.VoucherDate <=@ToDate) AND (TVoucherDetails.SrNo = 501) And   TVoucherEntry.IsCancel=@Temp )as VoucherNo,
+		      TVoucherEntry.VoucherUserNo as BillNo,
+					(Select ISNULL(SUM(Debit+Credit), 0) 
+                           from TVoucherEntry as TVoucherEntry_1 INNER JOIN
+                      TVoucherDetails ON TVoucherEntry_1.PkVoucherNo = TVoucherDetails.FkVoucherNo
+                            WHERE      (TVoucherDetails.FKVoucherNo = TVoucherEntry_1.PkVoucherNo) AND (TVoucherDetails.SrNo=501) AND (TVoucherEntry.PayTypeNo  = TVoucherEntry_1.PayTypeNo)
+							and TVoucherEntry.IsCancel=@Temp and TVoucherEntry_1.PkVoucherNo=TVoucherEntry.PkVoucherNo) as TotalAmount,
+				Case When(TVoucherEntry.MixMode=0) Then MPayType.ShortName Else 'MX' End as Prefix,
+				1 AS VchTypeNo 
+				FROM    TVoucherEntry INNER JOIN MVoucherType ON TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode INNER JOIN
+				TVoucherDetails AS TVoucherDetails_1 ON TVoucherEntry.PkVoucherNo = TVoucherDetails_1.FkVoucherNo INNER JOIN
+                MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo
+				WHERE (TVoucherEntry.VoucherTypeCode in(@VchNo)) AND  (TVoucherEntry.VoucherDate >= @FrDate) AND 
+				(TVoucherEntry.VoucherDate <= @ToDate) AND (TVoucherDetails_1.SrNo = 501) and (Select ISNULL(SUM(Debit+Credit), 0) 
+                           from TVoucherEntry as TVoucherEntry_1 INNER JOIN
+                      TVoucherDetails ON TVoucherEntry_1.PkVoucherNo = TVoucherDetails.FkVoucherNo
+                            WHERE      (TVoucherDetails.FKVoucherNo = TVoucherEntry_1.PkVoucherNo) AND (TVoucherDetails.SrNo=501) AND (TVoucherEntry.PayTypeNo  = TVoucherEntry_1.PayTypeNo)
+							and TVoucherEntry.IsCancel=@Temp and TVoucherEntry_1.PkVoucherNo=TVoucherEntry.PkVoucherNo)<>0
+							
+				
+
+
+union 
+
+SELECT DISTINCT TVoucherEntry.VoucherDate as Date ,                          
+                          (SELECT     LedgerName
+                            FROM          MLedger
+                            WHERE      (LedgerNo = TVoucherDetails_1.LedgerNo)) AS Party,
+			  MVoucherType.VoucherTypeName,
+			  (Select count(*)  from TVoucherEntry INNER JOIN
+                      TVoucherDetails ON TVoucherEntry.PkVoucherNo = TVoucherDetails.FkVoucherNo
+				WHERE (TVoucherEntry.VoucherTypeCode  in (@TVchNo)) AND  (TVoucherEntry.VoucherDate >= @FrDate) AND 
+				(TVoucherEntry.VoucherDate <=@ToDate) AND (TVoucherDetails.SrNo = 501) And   TVoucherEntry.IsCancel=@Temp )as VoucherNo,
+		      TVoucherEntry.VoucherUserNo as BillNo,
+					(Select ISNULL(SUM(Debit+Credit), 0) 
+                           from TVoucherEntry as TVoucherEntry_1 INNER JOIN
+                      TVoucherDetails ON TVoucherEntry_1.PkVoucherNo = TVoucherDetails.FkVoucherNo
+                            WHERE      (TVoucherDetails.FKVoucherNo = TVoucherEntry_1.PkVoucherNo) AND (TVoucherDetails.SrNo=501) AND (TVoucherEntry.PayTypeNo  = TVoucherEntry_1.PayTypeNo)
+							and TVoucherEntry.IsCancel=@Temp and TVoucherEntry_1.PkVoucherNo=TVoucherEntry.PkVoucherNo)*-1 as TotalAmount,
+				Case When(TVoucherEntry.MixMode=0) Then MPayType.ShortName Else 'MX' End as Prefix,
+				2 AS VchTypeNo 
+				FROM    TVoucherEntry INNER JOIN MVoucherType ON TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode INNER JOIN
+				TVoucherDetails AS TVoucherDetails_1 ON TVoucherEntry.PkVoucherNo = TVoucherDetails_1.FkVoucherNo INNER JOIN
+                MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo
+				WHERE (TVoucherEntry.VoucherTypeCode in(@TVchNo)) AND  (TVoucherEntry.VoucherDate >= @FrDate) AND 
+				(TVoucherEntry.VoucherDate <= @ToDate) AND (TVoucherDetails_1.SrNo = 501) and (Select ISNULL(SUM(Debit+Credit), 0) 
+                           from TVoucherEntry as TVoucherEntry_1 INNER JOIN
+                      TVoucherDetails ON TVoucherEntry_1.PkVoucherNo = TVoucherDetails.FkVoucherNo
+                            WHERE      (TVoucherDetails.FKVoucherNo = TVoucherEntry_1.PkVoucherNo) AND (TVoucherDetails.SrNo=501) AND (TVoucherEntry.PayTypeNo  = TVoucherEntry_1.PayTypeNo)
+							and TVoucherEntry.IsCancel=@Temp and TVoucherEntry_1.PkVoucherNo=TVoucherEntry.PkVoucherNo)*-1<>0
+
+
+				ORDER BY VchTypeNo,TVoucherEntry.VoucherDate,BillNo
+
+
+
+
+End
+
+if(@Type=2)
+
+Begin
+SELECT TVoucherEntry.VoucherDate as Date , '' Party, MVoucherType.VoucherTypeName, 0 as VoucherNo,Count(TVoucherEntry.VoucherDate) as TotalBills,
+			  SUM(Debit+Credit) as TotalAmount,'' as Prefix, 1  AS VchTypeNo 
+				FROM    TVoucherEntry INNER JOIN MVoucherType ON TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode INNER JOIN
+				TVoucherDetails AS TVoucherDetails_1 ON TVoucherEntry.PkVoucherNo = TVoucherDetails_1.FkVoucherNo 
+				WHERE (TVoucherEntry.VoucherTypeCode in(@VchNo)) AND  (TVoucherEntry.VoucherDate >= @FrDate) AND 
+				(TVoucherEntry.VoucherDate <= @ToDate) AND (TVoucherDetails_1.SrNo = 501) AND  TVoucherEntry.IsCancel=@Temp and (Debit+Credit) <>0
+                GROUP BY TVoucherEntry.VoucherDate, MVoucherType.VoucherTypeName
+
+union 
+
+SELECT TVoucherEntry.VoucherDate as Date , '' Party, MVoucherType.VoucherTypeName, 0 as VoucherNo, Count(TVoucherEntry.VoucherDate) as TotalBills,
+			  SUM(Debit+Credit)*-1 as TotalAmount,'' as Prefix, 2 AS VchTypeNo 
+				FROM    TVoucherEntry INNER JOIN MVoucherType ON TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode INNER JOIN
+				TVoucherDetails AS TVoucherDetails_1 ON TVoucherEntry.PkVoucherNo = TVoucherDetails_1.FkVoucherNo 
+				WHERE (TVoucherEntry.VoucherTypeCode in(@TVchNo)) AND  (TVoucherEntry.VoucherDate >= @FrDate) AND 
+				(TVoucherEntry.VoucherDate <= @ToDate) AND (TVoucherDetails_1.SrNo = 501) AND  TVoucherEntry.IsCancel=@Temp and (Debit+Credit) <>0
+				GROUP BY TVoucherEntry.VoucherDate, MVoucherType.VoucherTypeName
+
+ORDER BY VchTypeNo,Date
+end
+
+if(@Type=3)
+
+Begin
+
+SELECT min(TVoucherEntry.VoucherDate) as Date , DateName( month , DateAdd( month , Month(TVoucherEntry.VoucherDate) , 0 ) - 1 ) +' -- '+ 
+        Cast(Year(TVoucherEntry.VoucherDate) % 100 as varchar) Party, MVoucherType.VoucherTypeName, 0 as VoucherNo,
+        Count(TVoucherEntry.VoucherDate) as TotalBills,  SUM(Debit+Credit) TotalAmount,'' as Prefix, 1 AS VchTypeNo 
+				FROM    TVoucherEntry INNER JOIN MVoucherType ON TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode INNER JOIN
+				TVoucherDetails AS TVoucherDetails_1 ON TVoucherEntry.PkVoucherNo = TVoucherDetails_1.FkVoucherNo 
+				WHERE (TVoucherEntry.VoucherTypeCode in(@VchNo)) AND  (TVoucherEntry.VoucherDate >= @FrDate) AND 
+				(TVoucherEntry.VoucherDate <= @ToDate) AND (TVoucherDetails_1.SrNo = 501) AND  TVoucherEntry.IsCancel=@Temp  and (Debit+Credit) <>0
+                GROUP BY Year(TVoucherEntry.VoucherDate), Month(TVoucherEntry.VoucherDate), MVoucherType.VoucherTypeName
+
+union 
+
+SELECT min(TVoucherEntry.VoucherDate) as Date , DateName( month , DateAdd( month , Month(TVoucherEntry.VoucherDate) , 0 ) - 1 ) +' -- '+ 
+        Cast(Year(TVoucherEntry.VoucherDate) % 100 as varchar) Party, MVoucherType.VoucherTypeName, 0 as VoucherNo,
+        Count(TVoucherEntry.VoucherDate) as TotalBills,  SUM(Debit+Credit)*-1 TotalAmount,'' as Prefix, 2 AS VchTypeNo 
+				FROM    TVoucherEntry INNER JOIN MVoucherType ON TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode INNER JOIN
+				TVoucherDetails AS TVoucherDetails_1 ON TVoucherEntry.PkVoucherNo = TVoucherDetails_1.FkVoucherNo 
+				WHERE (TVoucherEntry.VoucherTypeCode in(@TVchNo)) AND  (TVoucherEntry.VoucherDate >= @FrDate) AND 
+				(TVoucherEntry.VoucherDate <= @ToDate) AND (TVoucherDetails_1.SrNo = 501) AND  TVoucherEntry.IsCancel=@Temp and (Debit+Credit) <>0
+                GROUP BY Year(TVoucherEntry.VoucherDate), Month(TVoucherEntry.VoucherDate), MVoucherType.VoucherTypeName
+
+ORDER BY VchTypeNo, Date
+end
+
+if(@Type=4)
+
+Begin
+
+SELECT '01-01-1900' as Date, 'Quarter-'+Cast(datepart (q, min(TVoucherEntry.VoucherDate)) as varchar) As Party, 
+        MVoucherType.VoucherTypeName, 0 as VoucherNo,
+        Count(TVoucherEntry.VoucherUserNo) as TotalBills,  SUM(Debit+Credit) TotalAmount,'' as Prefix, 1 AS VchTypeNo 
+				FROM    TVoucherEntry INNER JOIN MVoucherType ON TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode INNER JOIN
+				TVoucherDetails AS TVoucherDetails_1 ON TVoucherEntry.PkVoucherNo = TVoucherDetails_1.FkVoucherNo 
+				WHERE (TVoucherEntry.VoucherTypeCode in(@VchNo)) AND  (TVoucherEntry.VoucherDate >= @FrDate) AND 
+				(TVoucherEntry.VoucherDate <= @ToDate) AND (TVoucherDetails_1.SrNo = 501) AND  TVoucherEntry.IsCancel=@Temp and (Debit+Credit) <>0
+                GROUP BY Year(TVoucherEntry.VoucherDate), datepart (q,TVoucherEntry.VoucherDate), MVoucherType.VoucherTypeName
+union 
+
+SELECT '01-01-1900'  as Date, 'Quarter-'+Cast(datepart (q, min(TVoucherEntry.VoucherDate)) as varchar) As Party, 
+        MVoucherType.VoucherTypeName, 0 as VoucherNo,
+        Count(TVoucherEntry.VoucherDate) as TotalBills,  SUM(Debit+Credit)*-1 TotalAmount,'' as Prefix, 2 AS VchTypeNo 
+				FROM    TVoucherEntry INNER JOIN MVoucherType ON TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode INNER JOIN
+				TVoucherDetails AS TVoucherDetails_1 ON TVoucherEntry.PkVoucherNo = TVoucherDetails_1.FkVoucherNo 
+				WHERE (TVoucherEntry.VoucherTypeCode in(@TVchNo)) AND  (TVoucherEntry.VoucherDate >= @FrDate) AND 
+				(TVoucherEntry.VoucherDate <= @ToDate) AND (TVoucherDetails_1.SrNo = 501) AND  TVoucherEntry.IsCancel=@Temp and (Debit+Credit) <>0
+                GROUP BY Year(TVoucherEntry.VoucherDate),datepart (q,TVoucherEntry.VoucherDate), MVoucherType.VoucherTypeName
+
+order by VchTypeNo, Date, Party
+end
+
+
+End
+
+
+
+

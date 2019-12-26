@@ -1,0 +1,173 @@
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+GO
+--Created on 09/12/2011
+ALTER PROCEDURE [dbo].[AddMLedgerDetails]
+     @LedgerDetailsNo                           numeric(18),
+     @LedgerNo                            numeric(18),
+     @CreditLimit                         numeric(18,2),
+     @CreditDays                          numeric(18),
+     @Address                             varchar(300),
+     @StateNo                             numeric(18),
+     @CityNo                              numeric(18),
+     @PinCode                             varchar(100),
+     @PhNo1                               varchar(100),
+     @PhNo2                               varchar(100),
+     @MobileNo1                           varchar(100),
+     @MobileNo2                           varchar(100),
+     @EmailID                             varchar(100),
+     @CustomerType                        numeric(18,0),
+     @PANNo                               varchar(100),
+     @AccountNo                           varchar(150),
+     @ReportName                          varchar(max),
+     @UserID                              numeric(18),
+     @UserDate                            datetime,
+	 @CompanyNo						      numeric(18),
+	 @FSSAI								  varchar(100),
+	 @AreaNo							  numeric(18),
+	 @AddressLang                         nvarchar(500),
+     @RateTypeNo						  numeric(18),
+     @DiscPer						      numeric(18),
+     @DiscRs					      	  numeric(18),
+     @AdharNo					          varchar(100),
+     @AnyotherNo1					      varchar(100),
+     @AnyotherNo2				      	  varchar(100),
+     @GSTNo				            	  varchar(100),
+     @FSSAIDate                           datetime,
+     @GSTDate                             datetime,
+	 @Distance							  numeric(18,2)
+AS
+IF EXISTS(select LedgerDetailsNo from MLedgerDetails
+          where
+          LedgerDetailsNo = @LedgerDetailsNo)
+     BEGIN
+       --Update existing row
+       UPDATE MLedgerDetails
+       SET
+          LedgerNo = @LedgerNo,
+          CreditLimit=@CreditLimit,
+          CreditDays=@CreditDays, 
+          Address = @Address,
+	      StateNo=@StateNo,
+          CityNo = @CityNo,
+          PinCode = @PinCode,
+          PhNo1 = @PhNo1,
+          PhNo2 = @PhNo2,
+          MobileNo1 = @MobileNo1,
+          MobileNo2 = @MobileNo2,
+          EmailID = @EmailID,
+          CustomerType = @CustomerType,
+          PANNo=@PANNo,
+          AccountNo=@AccountNo,
+          
+         ReportName=@ReportName,
+          UserID = @UserID,
+          UserDate = @UserDate,
+		  CompanyNo = @CompanyNo,
+		  FSSAI = @FSSAI,	
+	      AreaNo = @AreaNo,
+          ModifiedBy =  isnull(ModifiedBy,'') + cast(@UserID as varchar)+'@'+ CONVERT(VARCHAR(10), GETDATE(), 105),
+          StatusNo=2,
+		  AddressLang=@AddressLang ,
+		  RateTypeNo=@RateTypeNo,
+		  DiscPer	=@DiscPer,
+		  DiscRs	=@DiscRs,
+		  AdharCardNo=@AdharNo,
+          AnyotherNo1=@AnyotherNo1,
+          AnyotherNo2=@AnyotherNo2,
+		  GSTNo=@GSTNo,
+          FSSAIDate=@FSSAIDate,
+		  GSTDate=@GSTDate,
+		  Distance = @Distance
+
+       WHERE
+          LedgerDetailsNo = @LedgerDetailsNo
+
+     END
+ELSE
+     BEGIN
+       --Insert new row
+       Declare @Id numeric
+       SELECT @Id=IsNull(Max(LedgerDetailsNo),0) From MLedgerDetails
+       DBCC CHECKIDENT('MLedgerDetails', RESEED, @Id)
+       INSERT INTO MLedgerDetails(
+          LedgerNo,
+          CreditLimit,
+          CreditDays,
+          Address,
+		  StateNo,
+          CityNo,
+          PinCode,
+          PhNo1,
+          PhNo2,
+          MobileNo1,
+          MobileNo2,
+          EmailID,     
+          CustomerType,
+          PANNo,
+          AccountNo,
+          ReportName,      
+          UserID,
+          UserDate,
+          StatusNo,
+		  CompanyNo,  
+		  FSSAI,
+	      AreaNo,
+		  AddressLang,
+		  RateTypeNo,
+		  DiscPer,
+		  DiscRs,
+          AdharCardNo,
+	      AnyotherNo1,
+		  AnyotherNo2,
+		  GSTNo,
+		  FSSAIDate,
+		  GSTDate,
+		  Distance
+)
+       VALUES(
+          @LedgerNo,
+          @CreditLimit,
+          @CreditDays,
+          @Address,
+		  @StateNo,
+          @CityNo,
+          @PinCode,
+          @PhNo1,
+          @PhNo2,
+          @MobileNo1,
+          @MobileNo2,
+          @EmailID,
+          @CustomerType,
+          @PANNo,
+          @AccountNo,
+          @ReportName,
+          @UserID,
+          @UserDate,
+          1,
+		  @CompanyNo,
+		  @FSSAI,
+	      @AreaNo,
+		  @AddressLang,
+		  @RateTypeNo,
+          @DiscPer,
+          @DiscRs,
+          @AdharNo,
+		  @AnyotherNo1,
+		  @AnyotherNo2,
+		  @GSTNo,
+		  @FSSAIDate,
+		  @GSTDate,
+		  @Distance
+)
+
+END
+
+
+
+
+
+
+
+
+

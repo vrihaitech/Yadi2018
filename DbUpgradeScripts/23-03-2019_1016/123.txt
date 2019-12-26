@@ -1,0 +1,103 @@
+ee the end of this message for details on invoking 
+just-in-time (JIT) debugging instead of this dialog box.
+
+************** Exception Text **************
+System.IO.IOException: Logon failure: unknown user name or bad password.
+
+   at System.IO.__Error.WinIOError(Int32 errorCode, String maybeFullPath)
+   at System.IO.Directory.InternalCreateDirectory(String fullPath, String path, DirectorySecurity dirSecurity)
+   at System.IO.Directory.CreateDirectory(String path, DirectorySecurity directorySecurity)
+   at System.IO.Directory.CreateDirectory(String path)
+   at CraneHardware.Master.DutyGroupAE.btnBrowser_Click(Object sender, EventArgs e)
+   at System.Windows.Forms.Control.OnClick(EventArgs e)
+   at System.Windows.Forms.Button.OnClick(EventArgs e)
+   at System.Windows.Forms.Button.OnMouseUp(MouseEventArgs mevent)
+   at System.Windows.Forms.Control.WmMouseUp(Message& m, MouseButtons button, Int32 clicks)
+   at System.Windows.Forms.Control.WndProc(Message& m)
+   at System.Windows.Forms.ButtonBase.WndProc(Message& m)
+   at System.Windows.Forms.Button.WndProc(Message& m)
+   at System.Windows.Forms.Control.ControlNativeWindow.OnMessage(Message& m)
+   at System.Windows.Forms.Control.ControlNativeWindow.WndProc(Message& m)
+   at System.Windows.Forms.NativeWindow.Callback(IntPtr hWnd, Int32 msg, IntPtr wparam, IntPtr lparam)
+
+
+************** Loaded Assemblies **************
+mscorlib
+    Assembly Version: 2.0.0.0
+    Win32 Version: 2.0.50727.5420 (Win7SP1.050727-5400)
+    CodeBase: file:///C:/Windows/Microsoft.NET/Framework/v2.0.50727/mscorlib.dll
+----------------------------------------
+CraneHardware
+    Assembly Version: 1.0.0.0
+    Win32 Version: 1.0.0.0
+    CodeBase: file:///D:/CraneHardwareNew%20Setup/CraneHardware.exe
+----------------------------------------
+System.Windows.Forms
+    Assembly Version: 2.0.0.0
+    Win32 Version: 2.0.50727.5420 (Win7SP1.050727-5400)
+    CodeBase: file:///C:/Windows/assembly/GAC_MSIL/System.Windows.Forms/2.0.0.0__b77a5c561934e089/System.Windows.Forms.dll
+----------------------------------------
+System
+    Assembly Version: 2.0.0.0
+    Win32 Version: 2.0.50727.5420 (Win7SP1.050727-5400)
+    CodeBase: file:///C:/Windows/assembly/GAC_MSIL/System/2.0.0.0__b77a5c561934e089/System.dll
+----------------------------------------
+System.Drawing
+    Assembly Version: 2.0.0.0
+    Win32 Version: 2.0.50727.5420 (Win7SP1.050727-5400)
+    CodeBase: file:///C:/Windows/assembly/GAC_MSIL/System.Drawing/2.0.0.0__b03f5f7f11d50a3a/System.Drawing.dll
+----------------------------------------
+OMControls
+    Assembly Version: 1.0.0.0
+    Win32 Version: 1.0.0.0
+    CodeBase: file:///D:/CraneHardwareNew%20Setup/OMControls.DLL
+----------------------------------------
+System.Data
+    Assembly Version: 2.0.0.0
+    Win32 Version: 2.0.50727.5420 (Win7SP1.050727-5400)
+    CodeBase: file:///C:/Windows/assembly/GAC_32/System.Data/2.0.0.0__b77a5c561934e089/System.Data.dll
+----------------------------------------
+System.Xml
+    Assembly Version: 2.0.0.0
+    Win32 Version: 2.0.50727.5420 (Win7SP1.050727-5400)
+    CodeBase: file:///C:/Windows/assembly/GAC_MSIL/System.Xml/2.0.0.0__b77a5c561934e089/System.Xml.dll
+----------------------------------------
+System.Configuration
+    Assembly Version: 2.0.0.0
+    Win32 Version: 2.0.50727.5420 (Win7SP1.050727-5400)
+    CodeBase: file:///C:/Windows/assembly/GAC_MSIL/System.Configuration/2.0.0.0__b03f5f7f11d50a3a/System.Configuration.dll
+----------------------------------------
+System.Transactions
+    Assembly Version: 2.0.0.0
+    Win32 Version: 2.0.50727.4927 (NetFXspW7.050727-4900)
+    CodeBase: file:///C:/Windows/assembly/GAC_32/System.Transactions/2.0.0.0__b77a5c561934e089/System.Transactions.dll
+----------------------------------------
+System.EnterpriseServices
+    Assembly Version: 2.0.0.0
+    Win32 Version: 2.0.50727.5420 (Win7SP1.050727-5400)
+    CodeBase: file:///C:/Windows/assembly/GAC_32/System.EnterpriseServices/2.0.0.0__b03f5f7f11d50a3a/System.EnterpriseServices.dll
+----------------------------------------
+System.Management
+    Assembly Version: 2.0.0.0
+    Win32 Version: 2.0.50727.5420 (Win7SP1.050727-5400)
+    CodeBase: file:///C:/Windows/assembly/GAC_MSIL/System.Management/2.0.0.0__b03f5f7f11d50a3a/System.Management.dll
+----------------------------------------
+
+************** JIT Debugging **************
+To enable just-in-time (JIT) debugging, the .config file for this
+application or computer (machine.config) must have the
+jitDebugging value set in the system.windows.forms section.
+The application must also be compiled with debugging
+enabled.
+
+For example:
+
+<configuration>
+    <system.windows.forms jitDebugging="true" />
+</configuration>
+
+When JIT debugging is enabled, any unhandled exception
+will be sent to the JIT debugger registered on the computer
+rather than be handled by this dialog box.
+
+

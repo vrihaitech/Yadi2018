@@ -1,0 +1,80 @@
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[GetSaleRegister]
+@VchNo int,
+@CompNo numeric(18),
+@FromDate datetime,
+@ToDate datetime,
+@Type numeric(18)
+
+
+AS
+
+
+--if(@Type=1)
+--SELECT  TVoucherEntry.VoucherDate, MVoucherType.VoucherTypeName, TVoucherEntry.Paytypeno, TVoucherEntry.VoucherUserNo,
+                          --(SELECT     ISNULL(SUM(Debit+Credit), 0) 
+                           -- FROM          TVoucherDetails
+                          --  WHERE      (TVoucherDetails.FKVoucherNo = TVoucherEntry.PkVoucherNo) AND (TVoucherDetails.SrNo=501) AND (TVoucherEntry.PayTypeNo in (Select PKPayTypeNo From MPayType Where ControlUnder in(2,6)) )) AS CashAmt,
+                         -- (SELECT     ISNULL(SUM(Debit+Credit), 0) 
+                          --  FROM          TVoucherDetails
+                          --  WHERE      (TVoucherDetails.FKVoucherNo = TVoucherEntry.PkVoucherNo) AND (TVoucherDetails.SrNo=501) AND (TVoucherEntry.PayTypeNo in (Select PKPayTypeNo From MPayType Where ControlUnder=3))) AS CreditAmt,
+                          --(SELECT     ISNULL(SUM(Debit+Credit), 0) 
+                           -- FROM          TVoucherDetails
+                          --  WHERE      (TVoucherDetails.FKVoucherNo = TVoucherEntry.PkVoucherNo) AND (TVoucherDetails.SrNo=501) AND (TVoucherEntry.PayTypeNo in (Select PKPayTypeNo From MPayType Where ControlUnder=4))) AS ChequeAmt,
+                        --  (SELECT     ISNULL(SUM(Debit+Credit), 0) 
+                           -- FROM          TVoucherDetails
+                          --  WHERE      (TVoucherDetails.FKVoucherNo = TVoucherEntry.PkVoucherNo) AND (TVoucherDetails.SrNo=501) AND (TVoucherEntry.PayTypeNo in (Select PKPayTypeNo From MPayType Where ControlUnder=5))) AS CCAmt,
+                          --(SELECT     LedgerName
+                           -- FROM          MLedger
+                           -- WHERE      (LedgerNo = TVoucherDetails_1.LedgerNo)) AS LedgerName,TVoucherEntry.IsCancel
+				--FROM    TVoucherEntry INNER JOIN MVoucherType ON TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode INNER JOIN
+				--TVoucherDetails AS TVoucherDetails_1 ON TVoucherEntry.PkVoucherNo = TVoucherDetails_1.FkVoucherNo
+				--WHERE (TVoucherEntry.VoucherTypeCode = 15) AND  (TVoucherEntry.VoucherDate >= @FromDate) AND 
+				--(TVoucherEntry.VoucherDate <= @ToDate) AND (TVoucherDetails_1.SrNo = 501)
+				--ORDER BY TVoucherEntry.VoucherDate
+if(@Type=1)
+
+SELECT     TVoucherEntry.VoucherDate, TVoucherEntry.VoucherUserNo,TVoucherEntry.Reference, MLedger.LedgerName,'' as ItemName, 0 as Barcode, TVoucherEntry.BilledAmount, MPayType.PayTypeName, TStock.Quantity, 
+                      TStock.BilledQuantity, TStock.NetAmount, TStock.Amount, TStock.SGSTPercentage, TStock.SGSTAmount, TStock.CGSTPercentage, TStock.CGSTAmount, 
+                      TStock.IGSTPercentage, TStock.IGSTAmount, TStock.CessPercentage, TStock.CessAmount, TStock.DiscPercentage, TStock.DiscAmount, TStock.DiscRupees, 
+                      TStock.DiscPercentage2, TStock.DiscAmount2, TStock.DiscRupees2,
+ '' as UOMName , '' AS FreeUomName,TStock.itemno,0 as MRP, TStock.PackagingCharges
+FROM         TVoucherEntry INNER JOIN
+                      MLedger ON TVoucherEntry.LedgerNo = MLedger.LedgerNo INNER JOIN
+                      MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo INNER JOIN
+                      TStock ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+WHERE (TVoucherEntry.VoucherTypeCode = @VchNo) AND  (TVoucherEntry.VoucherDate >= @FromDate) AND 
+				(TVoucherEntry.VoucherDate <= @ToDate) and TVoucherEntry.iscancel='false'
+				ORDER BY TVoucherEntry.VoucherDate, TVoucherEntry.VoucherUserNo
+
+
+else 
+
+SELECT     TVoucherEntry.VoucherDate, TVoucherEntry.VoucherUserNo,TVoucherEntry.Reference, MLedger.LedgerName, MItemGroup.ItemGroupName + ' ' + MItemMaster.ItemShortName AS ItemName, 
+                      MItemMaster.Barcode, TVoucherEntry.BilledAmount, MPayType.PayTypeName, TStock.Quantity, TStock.BilledQuantity, TStock.NetAmount, TStock.Amount, 
+                      TStock.SGSTPercentage, TStock.SGSTAmount, TStock.CGSTPercentage, TStock.CGSTAmount, TStock.IGSTPercentage, TStock.IGSTAmount, TStock.CessPercentage, 
+                      TStock.CessAmount, TStock.DiscPercentage, TStock.DiscAmount, TStock.DiscRupees, TStock.DiscPercentage2, TStock.DiscAmount2, TStock.DiscRupees2, 
+                      MUOM.UOMName, MUOM_1.UOMName AS FreeUomName, TStock.ItemNo, TStock.Rate, MRateSetting.MRP, TStock.PackagingCharges
+FROM         TVoucherEntry INNER JOIN
+                      MLedger ON TVoucherEntry.LedgerNo = MLedger.LedgerNo INNER JOIN
+                      MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo INNER JOIN
+                      TStock ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo INNER JOIN
+                      MItemMaster ON TStock.ItemNo = MItemMaster.ItemNo INNER JOIN
+                      MItemGroup ON MItemMaster.GroupNo = MItemGroup.ItemGroupNo INNER JOIN
+                      MUOM ON TStock.FkUomNo = MUOM.UOMNo INNER JOIN
+                      MUOM AS MUOM_1 ON TStock.FreeUOMNo = MUOM_1.UOMNo INNER JOIN
+                      MRateSetting ON TStock.FkRateSettingNo = MRateSetting.PkSrNo
+WHERE (TVoucherEntry.VoucherTypeCode = @VchNo) AND  (TVoucherEntry.VoucherDate >= @FromDate) AND 
+				(TVoucherEntry.VoucherDate <= @ToDate) and TVoucherEntry.iscancel='false'
+				ORDER BY  TVoucherEntry.VoucherDate, TVoucherEntry.VoucherUserNo
+
+
+
+
+
+
+
+
+

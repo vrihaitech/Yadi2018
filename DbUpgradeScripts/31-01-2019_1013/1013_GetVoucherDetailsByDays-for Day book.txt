@@ -1,0 +1,38 @@
+alter PROCEDURE [dbo].[GetVoucherDetailsByDays]
+@CurrDate datetime,
+@CompNo numeric(18),
+@MfgCompNo numeric(18)
+
+AS  
+
+if(@MfgCompNo=0)
+
+SELECT     Convert(Varchar(11), TVoucherEntry.VoucherDate, 105) AS VoucherDate, TVoucherEntry.VoucherUserNo,MLedger.LedgerName AS LedgerName, MVoucherType.VoucherTypeName, TVoucherDetails.FKVoucherNo,
+                     case when  TVoucherEntry.IsCancel='true' then 0 else   TVoucherDetails.Debit end  as [Debit Amount], 
+                         case when  TVoucherEntry.IsCancel='true' then 0 else TVoucherDetails.Credit end AS [Credit Amount] --TVoucherEntry.VoucherTypeCode,TVoucherEntry.VoucherUserNo
+FROM         TVoucherEntry INNER JOIN
+                      TVoucherDetails ON TVoucherEntry.PKVoucherNo = TVoucherDetails.FKVoucherNo INNER JOIN
+                      MLedger ON TVoucherDetails.LedgerNo = MLedger.LedgerNo INNER JOIN
+                      MVoucherType ON TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode
+WHERE      (TVoucherDetails.VoucherSrNo = 1) AND (Convert(varchar,TVoucherEntry.VoucherDate,101) = Convert(varchar,@CurrDate,101))
+			 AND (TVoucherEntry.CompanyNo = @CompNo)--and TVoucherEntry.IsCancel='false'
+union
+SELECT     Convert(Varchar(11), TVoucherEntry.VoucherDate, 105) AS VoucherDate, TVoucherEntry.VoucherUserNo,'PHYSICAL STOCK' as LedgerName, MVoucherType.VoucherTypeName, TVoucherEntry.PKVoucherNo,0 as [Debit Amount],
+			0 as [Credit Amount]
+FROM         TVoucherEntry INNER JOIN
+                      MVoucherType ON TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode
+WHERE      (TVoucherEntry.VoucherTypeCode = 8) AND (Convert(varchar,TVoucherEntry.VoucherDate,101) = Convert(varchar,@CurrDate,101))
+		and TVoucherEntry.IsCancel='false'	 AND (TVoucherEntry.CompanyNo = @CompNo)
+
+else
+
+	SELECT     Convert(Varchar(11), TVoucherEntry.VoucherDate, 105) AS VoucherDate, TVoucherEntryCompany.VoucherUserNo,MLedger.LedgerName AS LedgerName, MVoucherType.VoucherTypeName, TVoucherDetailsCompany.FKVoucherNo, 
+ case when  TVoucherEntry.IsCancel='true' then 0 else  TVoucherDetailsCompany.Debit end as [Debit Amount], 
+                      case when  TVoucherEntry.IsCancel='true' then 0 else  TVoucherDetailsCompany.Credit end AS [Credit Amount] --TVoucherEntry.VoucherTypeCode,TVoucherEntry.VoucherUserNo
+FROM         TVoucherEntry INNER JOIN TVoucherEntryCompany ON TVoucherEntry.PKVoucherNo=TVoucherEntryCompany.FKVoucherNo INNER JOIN 
+                      TVoucherDetailsCompany ON TVoucherEntryCompany.PKVoucherCompanyNo = TVoucherDetailsCompany.FKVoucherNo INNER JOIN
+                      MLedger ON TVoucherDetailsCompany.LedgerNo = MLedger.LedgerNo INNER JOIN
+                      MVoucherType ON TVoucherEntryCompany.VoucherTypeCode = MVoucherType.VoucherTypeCode
+WHERE      (TVoucherDetailsCompany.VoucherSrNo = 1) AND (Convert(varchar,TVoucherEntry.VoucherDate,101) = Convert(varchar,@CurrDate,101))
+	and TVoucherEntry.IsCancel='false'	 	 AND (TVoucherEntryCompany.CompanyNo = @CompNo) AND TVoucherEntryCompany.MfgCompNo=@MfgCompNo
+

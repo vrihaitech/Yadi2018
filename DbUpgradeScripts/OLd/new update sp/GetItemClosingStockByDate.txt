@@ -1,0 +1,44 @@
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+GO
+-- =============================================
+alter PROCEDURE [dbo].[GetItemClosingStockByDate]
+@MonthNo int,
+@CompNo numeric(18),
+@FrDate datetime,
+@ToDate datetime,	
+@ItemNo numeric(18)
+AS
+BEGIN
+	SELECT  Distinct   CONVERT(varchar(11), TVoucherEntry.VoucherDate, 105) AS VoucherDate, TVoucherEntry.VoucherUserNo AS VoucherSrNo , MLedger.LedgerName AS Particulars, MVoucherType.VoucherTypeName, TVoucherEntry.PKVoucherNo, 
+             case when  TStock.trncode=1 then sum(abs(TStock.BilledQuantity+TStock.FreeQty)) else 0 end as [Inward Quantity], case when  TStock.trncode=2 then sum(abs(TStock.BilledQuantity+TStock.FreeQty)) else 0 end AS [Outward Quantity]
+    FROM        TVoucherEntry INNER JOIN
+                      --TVoucherDetails ON TVoucherEntry.PKVoucherNo = TVoucherDetails.FKVoucherNo INNER JOIN
+                      MLedger ON TVoucherEntry.LedgerNo = MLedger.LedgerNo INNER JOIN
+                      MVoucherType ON TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode INNER JOIN
+                      TStock ON TVoucherEntry.PkVoucherNo  = TStock.FkVoucherTrnNo
+WHERE   --  (TVoucherDetails.VoucherSrNo = 1) AND 
+(TStock.ItemNo = @ItemNo) and (month(TVoucherEntry.VoucherDate)= @MonthNo)
+		And (TVoucherEntry.CompanyNo = @CompNo) And	(TVoucherEntry.VoucherDate >= @FrDate) And (TVoucherEntry.VoucherDate <= @ToDate)  and TVoucherEntry.IsCancel='false'
+Group by TVoucherEntry.VoucherDate,TVoucherEntry.VoucherUserNo,MLedger.LedgerName,MVoucherType.VoucherTypeName, TVoucherEntry.PKVoucherNo,
+TStock.trncode
+
+Union
+SELECT DISTINCT 
+                      CONVERT(varchar(11), TVoucherEntry.VoucherDate, 105) AS VoucherDate, TVoucherEntry.VoucherUserNo AS VoucherSrNo,MVoucherType.VoucherTypeName AS Particulars, MVoucherType.VoucherTypeName, TVoucherEntry.PKVoucherNo, 
+                      CASE WHEN TStock.trncode = 1 THEN sum(abs(TStock.BilledQuantity+TStock.FreeQty)) ELSE 0 END AS [Inward Quantity], 
+                      CASE WHEN TStock.trncode = 2 THEN sum(abs(TStock.BilledQuantity+TStock.FreeQty)) ELSE 0 END AS [Outward Quantity]
+FROM           TStock INNER JOIN
+                      TVoucherEntry INNER JOIN
+                      MVoucherType ON TVoucherEntry.VoucherTypeCode = MVoucherType.VoucherTypeCode ON TStock.FKVoucherNo = TVoucherEntry.PkVoucherNo
+WHERE     (TStock.ItemNo = @ItemNo) and (month(TVoucherEntry.VoucherDate)= @MonthNo)
+		And (TVoucherEntry.CompanyNo = @CompNo) And	(TVoucherEntry.VoucherDate >= @FrDate) And (TVoucherEntry.VoucherDate <= @ToDate) AND (TVoucherEntry.VoucherTypeCode in(23,24,8,32,19))  and TVoucherEntry.IsCancel='false'
+	Group by TVoucherEntry.VoucherDate,TVoucherEntry.VoucherUserNo,TVoucherEntry.VoucherTypeCode,MVoucherType.VoucherTypeName, TVoucherEntry.PKVoucherNo,
+TStock.trncode
+	
+END
+
+
+
+
+

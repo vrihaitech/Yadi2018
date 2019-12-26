@@ -1,0 +1,17 @@
+DELETE FROM TVOUCHERREFDETAILS WHERE LEDGERNO=0
+
+UPDATE TVOUCHERDETAILS  SET LEDGERNO=8 WHERE LEDGERNO=0 AND SRNO=507
+
+EXEC SetMisMatchVoucher 2
+EXEC SetMisMatchVoucher 5
+EXEC SetMisMatchVoucher 11
+EXEC SetMisMatchVoucher 4
+
+EXEC SetMisMatchVoucherES 2
+EXEC SetMisMatchVoucherES 5
+
+EXEC SetMisMatchVoucherP 2
+EXEC SetMisMatchVoucherP 4
+EXEC SetMisMatchVoucherP 11
+
+EXEC SetMisMatchVoucherPES 2

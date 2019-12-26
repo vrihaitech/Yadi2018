@@ -1,0 +1,50 @@
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+GO
+create PROCEDURE [dbo].[GetGSTSummary] 
+	@FromDate datetime,
+	@ToDate datetime,
+	@VchType numeric(18)
+AS
+
+
+Select * from (
+select pkvoucherno , a.ledgerno ,b.ledgername ,c.gstno, b.statecode , a.vouchertypecode ,voucheruserno , voucherdate , billedamount ,[0] ,[2.5],[6],[9],[14],0 as tax0,
+0 as tax25,0 as tax6,0 as tax9,0 as tax14  from 
+(
+Select fkvoucherno ,sgstpercentage , (sgstamount)  as taxamount from tstock) as tb1
+pivot
+(
+sum(taxamount)
+for  sgstpercentage in ([0],[2.5],[6],[9],[14]
+)
+)
+ as tb2
+ inner join tvoucherentry as a on tb2.fkvoucherno = a.pkvoucherno inner join mledger as b on a.ledgerno = b.ledgerno
+inner join mledgerdetails as c on b.ledgerno = c.ledgerno  and b.statecode=27
+WHERE  a.VoucherTypeCode=+cast(@VchType as varchar)
+			and a.VoucherDate>=''+cast(@FromDate as varchar)+'' and a.VoucherDate<=''+cast(@ToDate as varchar)+'' 
+
+union 
+
+select pkvoucherno , a.ledgerno ,b.ledgername ,c.gstno, b.statecode , a.vouchertypecode ,voucheruserno , voucherdate , billedamount ,0 as [0],0 as [2.5],0 as [6],0 as [9],0 as [14],
+[0] as tax0,
+[2.5] as tax25,[6] as tax6,[9] as tax9,[14] as tax14  from 
+
+ 
+(
+Select fkvoucherno ,sgstpercentage , (netamount)  as taxamount from tstock) as tb1
+pivot
+(
+sum(taxamount)
+for  sgstpercentage in ([0],[2.5],[6],[9],[14]
+)
+)
+ as tb2
+ inner join tvoucherentry as a on tb2.fkvoucherno = a.pkvoucherno inner join mledger as b on a.ledgerno = b.ledgerno  
+inner join mledgerdetails as c on b.ledgerno = c.ledgerno  and b.statecode=27
+WHERE  a.VoucherTypeCode= cast(@VchType as varchar)
+			and a.VoucherDate>=''+cast(@FromDate as varchar)+'' and a.VoucherDate<=''+cast(@ToDate as varchar)+'' 
+) as tbl4 
+
+order by voucheruserno--ledgerno , pkvoucherno 

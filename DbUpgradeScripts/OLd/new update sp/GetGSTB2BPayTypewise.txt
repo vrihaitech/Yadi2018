@@ -1,0 +1,48 @@
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+GO
+
+--Created ON 10-Dec-2015
+create PROCEDURE [dbo].[GetGSTB2BPayTypewise] 
+	@FromDate datetime,
+	@ToDate datetime
+	
+	
+AS
+BEGIN
+SELECT    'Cash SAles' as LedgerName, '21' as LedgerNo,SUM(TStock.NetAmount) AS basic, TStock.SGSTPercentage *2 AS taxPer,
+ SUM(TStock.SGSTAmount) as cgstamt  , sum(TStock.SGSTAmount) AS sgstamount,     SUM(TStock.Amount) AS Expr2, MPayType.PayTypeName
+FROM         TVoucherEntry INNER JOIN
+                      TStock ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo INNER JOIN
+                      MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo INNER JOIN
+                      MLedger ON TVoucherEntry.LedgerNo = MLedger.LedgerNo
+WHERE     (TVoucherEntry.VoucherTypeCode = 15) AND (TVoucherEntry.IsCancel = 'false') AND (TVoucherEntry.PayTypeNo = 2) AND (TVoucherEntry.LedgerNo = 21) 
+AND (TVoucherEntry.VoucherDate >= @FromDate) AND (TVoucherEntry.VoucherDate <=@ToDate)
+GROUP BY TStock.SGSTPercentage, MPayType.PayTypeName
+
+union 
+SELECT     MLedger.LedgerName, TVoucherEntry.LedgerNo, SUM(TStock.NetAmount) AS basic, TStock.SGSTPercentage * 2 AS taxPer,
+SUM(TStock.SGSTAmount) as cgstamt  , sum(TStock.SGSTAmount) AS sgstamount, 
+                      SUM(TStock.Amount) AS Expr2, MPayType.PayTypeName
+FROM         TVoucherEntry INNER JOIN
+                      TStock ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo INNER JOIN
+                      MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo INNER JOIN
+                      MLedger ON TVoucherEntry.LedgerNo = MLedger.LedgerNo
+WHERE     (TVoucherEntry.VoucherTypeCode = 15) AND (TVoucherEntry.IsCancel = 'false') AND (TVoucherEntry.PayTypeNo = 2) AND (TVoucherEntry.LedgerNo != 21) 
+AND (TVoucherEntry.VoucherDate >= @FromDate) AND (TVoucherEntry.VoucherDate <=@ToDate)
+GROUP BY TVoucherEntry.LedgerNo, TStock.SGSTPercentage, MPayType.PayTypeName, MLedger.LedgerName
+union
+SELECT     MLedger.LedgerName, TVoucherEntry.LedgerNo, SUM(TStock.NetAmount) AS basic, TStock.SGSTPercentage * 2 AS taxPer,
+SUM(TStock.SGSTAmount) as cgstamt  , sum(TStock.SGSTAmount) AS sgstamount, 
+                      SUM(TStock.Amount) AS Expr2, MPayType.PayTypeName
+FROM         TVoucherEntry INNER JOIN
+                      TStock ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo INNER JOIN
+                      MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo INNER JOIN
+                      MLedger ON TVoucherEntry.LedgerNo = MLedger.LedgerNo
+WHERE     (TVoucherEntry.VoucherTypeCode = 15) AND (TVoucherEntry.IsCancel = 'false') AND (TVoucherEntry.PayTypeNo!= 2)
+AND (TVoucherEntry.VoucherDate >= @FromDate) AND (TVoucherEntry.VoucherDate <=@ToDate)
+GROUP BY TVoucherEntry.LedgerNo, TStock.SGSTPercentage, MPayType.PayTypeName, MLedger.LedgerName
+
+end
+
+

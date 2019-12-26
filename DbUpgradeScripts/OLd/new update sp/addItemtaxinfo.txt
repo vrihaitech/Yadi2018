@@ -1,0 +1,82 @@
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+GO
+--Created on 09/12/2011
+ALTER PROCEDURE [dbo].[AddMItemTaxInfo1]
+     @PkSrNo                              numeric(18),
+     @ItemNo                              numeric(18),
+     @TaxLedgerNo                         numeric(18),
+	 @SalesLedgerNo						  numeric(18),
+     @FromDate                            datetime,
+     @CalculationMethod                   varchar(50),
+     @Percentage                          numeric(18,2),
+     @CompanyNo                           numeric(18),
+	 @FKTaxSettingNo					  numeric(18),
+     @UserID                              numeric(18),
+     @UserDate                            datetime
+     --@ModifiedBy                          varchar(50)
+AS
+
+IF EXISTS(select PkSrNo from MItemTaxInfo
+          where
+          PkSrNo = @PkSrNo)
+     BEGIN
+       --Update existing row
+       UPDATE MItemTaxInfo
+       SET
+          ItemNo = @ItemNo,
+          TaxLedgerNo = @TaxLedgerNo,
+		  SalesLedgerNo=@SalesLedgerNo,
+         FromDate = @FromDate,
+          CalculationMethod = @CalculationMethod,
+          Percentage = @Percentage,
+          CompanyNo = @CompanyNo,
+		  FKTaxSettingNo = @FKTaxSettingNo,
+          UserID = @UserID,
+          UserDate = @UserDate,
+          ModifiedBy = isnull(ModifiedBy,'') + cast(@UserID as varchar)+'@'+ CONVERT(VARCHAR(10), GETDATE(), 105),
+          StatusNo=2
+       WHERE
+          PkSrNo = @PkSrNo
+
+     END
+ELSE 
+
+	BEGIN
+	   --Insert new row
+	   Declare @Id numeric
+	   SELECT @Id=IsNull(Max(PkSrNo),0) From MItemTaxInfo
+	   DBCC CHECKIDENT('MItemTaxInfo', RESEED, @Id)
+	   INSERT INTO MItemTaxInfo(
+		  ItemNo,
+		  TaxLedgerNo,
+		  SalesLedgerNo,
+		  FromDate,
+		  CalculationMethod,
+		  Percentage,
+		  CompanyNo,
+		  FKTaxSettingNo,
+		  UserID,
+		  UserDate,
+          StatusNo
+		 -- ModifiedBy
+       )
+	   VALUES(
+		  @ItemNo,
+		  @TaxLedgerNo,
+		  @SalesLedgerNo,
+		  @FromDate,
+		  @CalculationMethod,
+		  @Percentage,
+		  @CompanyNo,
+		  @FKTaxSettingNo,
+		  @UserID,
+		  @UserDate,
+          1
+		  --@ModifiedBy
+       )
+
+	 
+END
+
+

@@ -1,0 +1,278 @@
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+GO
+
+ALTER FUNCTION [dbo].[GetOpeningStock]
+	(
+	@CompNo		numeric(18),
+	@FromDate	datetime,
+	@ItemNo		numeric(18),
+	@Type		int,
+	@No			numeric(18)
+	)
+RETURNS @TStockBal Table(OpQty numeric(18,2),OpAmt numeric(18,2))
+AS
+	BEGIN
+	Declare @OpAmt numeric(18,2),@OpQty numeric(18,2),@DrAmt numeric(18,2),@DrQty numeric(18,2)
+Declare @CrAmt numeric(18,2),@CrQty numeric(18,2),@ClosingQty numeric(18,2),@CategoryNo numeric(18,2)
+Declare @Rate numeric(18,2),@BalAmt numeric(18,2)
+Declare @OpDt datetime,@TrnDr int,@TrnCr int
+Declare @VType int,@VNo numeric(18)--@IsJobWork int,@JobWorkCo numeric(18),
+Declare @DAmt numeric(18,2),@DQty Numeric(18,2),@CAmt numeric(18,2),@CQty Numeric(18,2)
+Declare @Cnt int
+set @VType=0 set @VNo=0--set @IsJobWork=0 set @JobWorkCo=0 
+set @Cnt=0
+	set @ClosingQty = 0 set @BalAmt = 0
+set @DrQty=0 set @DrAmt=0 set @CrQty = 0 set @CrAmt = 0
+set @TrnDr = 1 set @TrnCr = 2
+
+if(@Type =0)--Stock Summary
+begin
+	
+	select @OpDt=BooksBeginFrom from Mfirm
+	set @OpDt=0
+	
+
+	set @OpAmt =0 set @OpQty=0
+	if(@FromDate <= @OpDt)
+	begin
+	
+	insert into @TStockBal values(@OpQty,@OpAmt)
+	set @Cnt=1
+	end
+	else
+	begin
+		Declare CurDr Cursor For 	
+		SELECT     isnull(TStock.Amount,0), isNull(abs(TStock.BilledQuantity),0)--isnull(abs(TStock.Quantity),0)+isnull(abs(TStock.FreeQty),0)
+					,TVoucherEntry.VoucherTypeCode,TVoucherEntry.PKVoucherNo--@DrAmt=isnull(SUM(TStock.Amount),0) , @DrQty=isnull(SUM(TStock.Quantity) ,0)
+		From TVoucherEntry INNER JOIN
+                      TStock ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+
+		WHERE     (TStock.ItemNo = @ItemNo) AND (TStock.TrnCode = @TrnDr) AND 
+			(TVoucherEntry.VoucherDate >= @OpDt) AND 
+                      (TVoucherEntry.VoucherDate <= DateAdd(d,-1,@FromDate)) and TVoucherEntry.IsCancel='false'
+                      
+		Declare CurCr Cursor For
+		SELECT     isnull(TStock.Amount,0),isNull(abs(TStock.BilledQuantity),0)-- isnull(TStock.Quantity,0)+isnull(TStock.FreeQty,0)
+			,TVoucherEntry.VoucherTypeCode,TVoucherEntry.PKVoucherNo--@CrAmt=isnull(SUM(TStock.Amount),0) , @CrQty=isnull(SUM(TStock.Quantity),0) 
+		FROM   TVoucherEntry INNER JOIN
+                      TStock ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+
+		WHERE     (TStock.ItemNo = @ItemNo) AND (TStock.TrnCode = @TrnCr)  AND 
+		(TVoucherEntry.VoucherDate >= @OpDt) AND 
+        (TVoucherEntry.VoucherDate <= DateAdd(d,-1,@FromDate)) and TVoucherEntry.IsCancel='false'
+            
+     
+	insert into @TStockBal values(@ClosingQty,@BalAmt)
+	end
+end
+--===============================================================================================================
+else if(@Type = 1)--Godownwise Stock
+begin	
+	select @OpDt=BooksBeginFrom from Mfirm
+
+	set @OpAmt=0 set @OpQty=0
+	if(@FromDate <= @OpDt)
+	begin
+	
+	insert into @TStockBal values(@OpQty,@OpAmt)
+	set @Cnt=1
+	end
+	else
+	begin
+		Declare CurDr Cursor For 	
+		SELECT     isnull(TStock.Amount,0), isnull(abs(TStockGodown.Qty),0),TVoucherEntry.VoucherTypeCode,TVoucherEntry.PKVoucherNo-- @DrAmt=isnull(SUM(TStock.Amount),0) , @DrQty=isnull(SUM(TStock.Quantity) ,0)
+		FROM  TVoucherEntry INNER JOIN
+                      TStock ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+
+					  INNER JOIN TStockGodown ON TStock.PkStockTrnNo = TStockGodown.FKStockTrnNo
+		WHERE     (TStock.ItemNo = @ItemNo) AND (TStock.TrnCode = @TrnDr)  AND 
+			(TVoucherEntry.VoucherDate >= @OpDt) AND 
+                        (TVoucherEntry.VoucherDate <= DateAdd(d,-1,@FromDate)) And TStockGodown.GodownNo=@No and TVoucherEntry.IsCancel='false'
+ 
+		Declare CurCr Cursor For
+		SELECT     isnull(TStock.Amount,0), isnull(TStockGodown.Qty,0),TVoucherEntry.VoucherTypeCode,TVoucherEntry.PKVoucherNo--     @CrAmt=isnull(SUM(TStock.Amount),0) , @CrQty=isnull(SUM(TStock.Quantity),0) 
+		FROM        TVoucherEntry INNER JOIN
+                      TStock ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+ INNER JOIN
+                      TStockGodown ON TStock.PkStockTrnNo = TStockGodown.FKStockTrnNo
+		WHERE     (TStock.ItemNo = @ItemNo) AND (TStock.TrnCode = @TrnCr) AND 
+			(TVoucherEntry.VoucherDate >= @OpDt) AND 
+                        (TVoucherEntry.VoucherDate <= DateAdd(d,-1,@FromDate)) And TStockGodown.GodownNo=@No and TVoucherEntry.IsCancel='false'
+            
+     
+	insert into @TStockBal values(@ClosingQty,@BalAmt)
+	end
+end	
+--===============================================================================================================
+else if(@Type = 3)--Categorywise Stock Details
+begin
+	--set @OpDt=@FromDate
+	--Select @OpDt=UserDate From MBranch where PKBranchCode=@BrID	
+	select @OpDt=BooksBeginFrom from Mfirm
+--	SELECT     @OpAmt=isnull(SUM(OpAmount),0), @OpQty=isnull(SUM(OpQuantity) ,0)
+--	FROM         MItemOpeningStock
+--	WHERE     (PkItemNo = @ItemNo) And PkItemNo=(Select ItemNo from MStockItems WHERE(CategoryNo =@No))
+	set @OpAmt=0 set @OpQty=0
+	--And IsJobWork=@IsJobWork AND ForJobWorkCompNo=@JobWorkCo
+	
+	if(@FromDate <= @OpDt)
+	begin
+	
+	insert into @TStockBal values(@OpQty,@OpAmt)
+	set @Cnt=1
+	end
+	else
+	begin
+		
+		Declare CurDr Cursor For 	
+		SELECT     isnull(TStock.Amount,0),  isNull(abs(TStock.BilledQuantity),0)--isnull(abs(TStock.Quantity),0)+isnull(abs(TStock.FreeQty),0)
+			,TVoucherEntry.VoucherTypeCode,TVoucherEntry.PKVoucherNo--     @DrAmt=isnull(SUM(TStock.Amount),0) , @DrQty=isnull(SUM(TStock.Quantity) ,0)
+		FROM     TVoucherEntry INNER JOIN
+                      TStock ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+INNER JOIN
+                      MStockItems_V(1,NULL,NULL,NULL,NULL,NULL,NULL) as MStockItems ON TStock.ItemNo = MStockItems.ItemNo
+		WHERE     (TStock.ItemNo = @ItemNo) AND (TStock.TrnCode = @TrnDr) AND 
+			(TVoucherEntry.VoucherDate >= @OpDt) AND 
+                      (TVoucherEntry.VoucherDate <= DateAdd(d,-1,@FromDate)) And MStockItems.FKCategoryNo=@No  and TVoucherEntry.IsCancel='false'
+ 
+		Declare CurCr Cursor For
+		SELECT     isnull(TStock.Amount,0),  isNull(abs(TStock.BilledQuantity),0)--isnull(TStock.Quantity,0)+isnull(TStock.FreeQty,0)
+			,TVoucherEntry.VoucherTypeCode,TVoucherEntry.PKVoucherNo--     @CrAmt=isnull(SUM(TStock.Amount),0) , @CrQty=isnull(SUM(TStock.Quantity),0) 
+		FROM      TVoucherEntry INNER JOIN
+                      TStock ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+ INNER JOIN
+                      MStockItems_V(1,NULL,NULL,NULL,NULL,NULL,NULL) as MStockItems ON TStock.ItemNo = MStockItems.ItemNo
+		WHERE     (TStock.ItemNo = @ItemNo) AND (TStock.TrnCode = @TrnCr) AND 
+			(TVoucherEntry.VoucherDate >= @OpDt) AND 
+                      (TVoucherEntry.VoucherDate <= DateAdd(d,-1,@FromDate)) And MStockItems.FKCategoryNo=@No and TVoucherEntry.IsCancel='false'
+            
+    
+	end
+end	
+--===============================================================================================================
+else if(@Type = 5)--Groupwise wise Stock Details
+begin
+	--set @OpDt=@FromDate
+	--Select @OpDt=UserDate From MBranch where PKBranchCode=@BrID	
+	select @OpDt=BooksBeginFrom from Mfirm
+--	SELECT     @OpAmt=isnull(SUM(OpAmount),0), @OpQty=isnull(SUM(OpQuantity) ,0)
+--	FROM         MItemOpeningStock
+--	WHERE     (PkItemNo = @ItemNo) 
+	--And IsJobWork=@IsJobWork AND ForJobWorkCompNo=@JobWorkCo
+	set @OpAmt=0 set @OpQty=0
+	if(@FromDate <= @OpDt)
+	begin
+	
+	insert into @TStockBal values(@OpQty,@OpAmt)
+	set @Cnt=1
+	end
+	else
+	begin
+		
+		Declare CurDr Cursor For 	
+		SELECT     isnull(TStock.Amount,0),  isNull(abs(TStock.BilledQuantity),0)--isnull(abs(TStock.Quantity),0)+isnull(abs(TStock.FreeQty),0)
+					,TVoucherEntry.VoucherTypeCode,TVoucherEntry.PKVoucherNo--     @DrAmt=isnull(SUM(TStock.Amount),0) , @DrQty=isnull(SUM(TStock.Quantity) ,0)
+		FROM      TVoucherEntry INNER JOIN
+                      TStock ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+ INNER JOIN
+                      MStockItems_V(1,NULL,NULL,NULL,NULL,NULL,NULL) as MStockItems ON TStock.ItemNo = MStockItems.ItemNo
+		WHERE     (TStock.ItemNo = @ItemNo) AND (TStock.TrnCode = @TrnDr) AND 
+			(TVoucherEntry.VoucherDate >= @OpDt) AND 
+                      (TVoucherEntry.VoucherDate <= DateAdd(d,-1,@FromDate)) And MStockItems.GroupNo=@No and TVoucherEntry.IsCancel='false'
+ 
+		Declare CurCr Cursor For
+		SELECT     isnull(TStock.Amount,0),  isNull(abs(TStock.BilledQuantity),0)--isnull(TStock.Quantity,0)+isnull(TStock.FreeQty,0)
+			,TVoucherEntry.VoucherTypeCode,TVoucherEntry.PKVoucherNo--     @CrAmt=isnull(SUM(TStock.Amount),0) , @CrQty=isnull(SUM(TStock.Quantity),0) 
+		FROM    TVoucherEntry INNER JOIN
+                      TStock ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+ INNER JOIN
+                      MStockItems_V(1,NULL,NULL,NULL,NULL,NULL,NULL) as MStockItems ON TStock.ItemNo = MStockItems.ItemNo
+		WHERE     (TStock.ItemNo = @ItemNo) AND (TStock.TrnCode = @TrnCr) AND 
+			(TVoucherEntry.VoucherDate >= @OpDt) AND 
+                      (TVoucherEntry.VoucherDate <= DateAdd(d,-1,@FromDate)) And MStockItems.GroupNo=@No and TVoucherEntry.IsCancel='false'
+            
+     
+	end
+end	
+--===============================================================================================================
+else if(@Type = 6)--Ledger wise Stock Details
+begin
+	--set @OpDt=@FromDate
+	--Select @OpDt=UserDate From MBranch where PKBranchCode=@BrID	
+	select @OpDt=BooksBeginFrom from Mfirm
+	/*SELECT     @OpAmt=isnull(SUM(OpAmount),0), @OpQty=isnull(SUM(OpQuantity) ,0)
+	FROM         MItemOpeningStock
+	WHERE     (PkItemNo = @ItemNo) AND (BranchCode = @BrID) */
+	set @OpAmt = 0 Set @OpQty = 0
+	if(@FromDate <= @OpDt)
+	begin
+	
+	insert into @TStockBal values(@OpQty,@OpAmt)
+	set @Cnt=1
+	end
+	else
+	begin
+		
+		Declare CurDr Cursor For 	
+		SELECT     isnull(TStock.Amount,0), isNull(abs(TStock.BilledQuantity),0)-- isnull(abs(TStock.Quantity),0)+isnull(abs(TStock.FreeQty),0)
+					,TVoucherEntry.VoucherTypeCode,TVoucherEntry.PKVoucherNo--     @DrAmt=isnull(SUM(TStock.Amount),0) , @DrQty=isnull(SUM(TStock.Quantity) ,0)
+		FROM         TVoucherEntry INNER JOIN
+                      TVoucherDetails ON TVoucherEntry.PkVoucherNo = TVoucherDetails.FkVoucherNo INNER JOIN
+                      TStock ON TVoucherDetails.PkVoucherTrnNo = TStock.FkVoucherTrnNo 
+							WHERE (TVoucherEntry.VoucherDate >= @OpDt) AND (TVoucherEntry.VoucherDate <= DateAdd(d,-1,@FromDate)) 
+							AND (TVoucherDetails.LedgerNo = @No) AND (TVoucherDetails.VoucherSrNo = 1)
+						--	And (TVoucherEntry.CompanyNo =@CompNo) 
+							AND (TStock.TrnCode = @TrnDr) And  (TStock.ItemNo = @ItemNo) and TVoucherEntry.IsCancel='false'
+ 
+		Declare CurCr Cursor For
+		SELECT     isnull(TStock.Amount,0),  isNull(abs(TStock.BilledQuantity),0)--isnull(TStock.Quantity,0)+isnull(TStock.FreeQty,0)
+				,TVoucherEntry.VoucherTypeCode,TVoucherEntry.PKVoucherNo--     @CrAmt=isnull(SUM(TStock.Amount),0) , @CrQty=isnull(SUM(TStock.Quantity),0) 
+		FROM       TVoucherEntry INNER JOIN
+                      TVoucherDetails ON TVoucherEntry.PkVoucherNo = TVoucherDetails.FkVoucherNo INNER JOIN
+                      TStock ON TVoucherDetails.PkVoucherTrnNo = TStock.FkVoucherTrnNo 
+							WHERE (TVoucherEntry.VoucherDate >= @OpDt) AND (TVoucherEntry.VoucherDate <= DateAdd(d,-1,@FromDate)) 
+							AND (TVoucherDetails.LedgerNo = @No) AND (TVoucherDetails.VoucherSrNo = 1)
+						--	And (TVoucherEntry.CompanyNo =@CompNo) 
+							AND (TStock.TrnCode = @TrnCr) And  (TStock.ItemNo = @ItemNo) and TVoucherEntry.IsCancel='false'
+      
+	end
+--===============================================================================================================
+end	
+
+if(@Cnt=0)
+begin
+--Open Debit Cursor
+Open CurDr
+	Fetch Next From CurDr Into @DAmt,@DQty,@VType,@VNo
+	While (@@Fetch_status=0)
+	begin
+		set @DrAmt=@DrAmt+@DAmt
+		set @DrQty=@DrQty+@DQty
+		Fetch Next From CurDr Into @DAmt,@DQty,@VType,@VNo
+	end
+	Close CurDr Deallocate CurDr
+
+set @VType=0 set @VNo=0	
+--Open Credit Cursor
+Open CurCr
+	Fetch Next From CurCr Into @CAmt,@CQty,@VType,@VNo
+	While (@@Fetch_status=0)
+	begin
+		set @CrAmt=@CrAmt+@CAmt
+		set @CrQty=@CrQty+@CQty
+		Fetch Next From CurCr Into @CAmt,@CQty,@VType,@VNo
+	end
+	Close CurCr Deallocate CurCr
+	
+set @ClosingQty=(@DrQty-@CrQty)+@OpQty
+	                   
+	set @BalAmt = (@DrAmt - @CrAmt)+ @OpAmt  
+	insert into @TStockBal values(@ClosingQty,@BalAmt)
+end
+	RETURN
+	END
+
+
+
+

@@ -1,0 +1,62 @@
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[GetMultiBill]
+@FromDate          datetime,
+@ToDate            datetime,
+@VchType           int,
+@CompanyNo                   varchar(50),
+@PartyNo                   varchar(max)
+
+
+AS
+Begin
+declare @Type						int
+set @Type=1
+SELECT    TVoucherEntry.PkVoucherNo,TVoucherEntry.LedgerNo, TVoucherEntry.VoucherUserNo, TVoucherEntry.VoucherDate, CASE WHEN (@Type = 1) 
+                      THEN MStockItems_V_1.ItemName ELSE MStockItems_V_1.ItemNameLang END AS ItemName,MRateSetting.MRP, 
+TStock.Quantity,TStock.GRWeight,TStock.TRWeight,
+TStock.PackagingCharges,TStock.NoOfBag,TStock.CessValue,TStock.OtherCharges as Dhekharek,
+ TStock.Rate, TStock.Amount,MUOM.UOMName, TStock.SGSTPercentage,TStock.SGSTAmount, 
+                       TStock.DiscPercentage,TStock.DiscAmount,TStock.DiscRupees,TStock.DiscPercentage2,TStock.DiscAmount2,TStock.DiscRupees2, TStock.CGSTPercentage,
+ TStock.CGSTAmount, TStock.IGSTPercentage, TStock.IGSTAmount, TStock.CessPercentage, 
+                      TStock.CessAmount, MLedgerDetails.GSTNO AS CustGSTNo, MLedgerDetails.PANNo AS CustPANNo,
+MLedgerDetails.FSSAI,MFirm.GSTNO as CmpGSTNo, MLedger.StateCode,MItemMaster.HSNCode, TVoucherEntry.BilledAmount,MFirm.FSSAINo as CompFSSAINO, 
+     CASE WHEN (@Type = 1) THEN LedgerName ELSE LedgerLangName END AS LedgerName,
+                      MLedger.ContactPerson, MLedgerDetails.PhNo1 as CustPhNo, MLedgerDetails.MobileNo1 as CustMoNo,
+
+         CASE WHEN (@Type = 1) THEN MLedgerDetails.Address ELSE MLedgerDetails.AddressLang end AS CustAddress,
+
+
+
+ MFirm.Address AS CmpAddress, MFirm.EmailID AS CmpEmailID,MFirm.PhoneNo1 +' / '+ Mfirm.PhoneNo2 as CompPhoneNo,
+
+
+
+ TVoucherEntry.Reference, TVoucherEntry.VoucherTime,(TStock.NetAmount + TStock.CessValue + TStock.PackagingCharges + TStock.OtherCharges)as NetAmount, TStock.NetRate,  TStock.DisplayItemName, TStock.Remarks as RemarksItemlevel,
+                      '' AS TransporterName,MTransporterPayType.TransPayTypeName,TVoucherEntry.LRNo,MTransporterMode.TransModeName, TVoucherEntry.TransNoOfItems,  
+               (SELECT     SettingValue   FROM   MSettings     WHERE      (PkSettingNo = 311)) AS DisplayTrans,TVoucherEntry.Remark, MState.StateName, MCity.CityName, MPayType.PayTypeName
+FROM         MLedgerDetails INNER JOIN
+                      TStock INNER JOIN  MUOM ON TStock.FkUomNo = MUOM.UOMNo INNER JOIN 
+                      TVoucherEntry ON TStock.FKVoucherNo = TVoucherEntry.PkVoucherNo INNER JOIN
+
+                      MFirm ON TVoucherEntry.CompanyNo = MFirm.FirmNo INNER JOIN
+                      MItemMaster ON TStock.ItemNo = MItemMaster.ItemNo INNER JOIN
+                      dbo.MStockItems_V(NULL, NULL, NULL, NULL, NULL, NULL, NULL) AS MStockItems_V_1 ON TStock.ItemNo = MStockItems_V_1.ItemNo INNER JOIN
+                      MLedger ON TVoucherEntry.LedgerNo = MLedger.LedgerNo ON MLedgerDetails.LedgerNo = MLedger.LedgerNo INNER JOIN
+                      MRateSetting ON TStock.FkRateSettingNo = MRateSetting.PkSrNo   LEFT OUTER JOIN
+ MTransporterMode ON TVoucherEntry.TransportMode = MTransporterMode.TransModeNo LEFT OUTER JOIN
+                      MTransporterPayType ON TVoucherEntry.TransPayType = MTransporterPayType.TransPayTypeNo INNER JOIN
+                      MState ON MLedger.StateCode = MState.StateCode INNER JOIN
+                      MCity ON MLedgerDetails.CityNo = MCity.CityNo INNER JOIN
+fn_Split (''+cast(@PartyNo as varchar(max))+ '','') AS Party_BILL on TVoucherEntry.LedgerNo= CAST(Party_BILL.value AS numeric) INNER JOIN
+
+                      MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo
+    
+WHERE      (TVoucherEntry.vouchertypecode = @VchType)
+ORDER BY TStock.PkStockTrnNo
+
+end
+
+

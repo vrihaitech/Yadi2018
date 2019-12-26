@@ -1,0 +1,92 @@
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+GO
+ALTER Procedure [dbo].[SetMisMatchVoucherPES]
+@PTypeNo numeric(18)
+As
+
+Declare @SPVchTypeCode	numeric(18), @RPVchTypeCode	numeric(18), @CompNo numeric(18),@PayTypeNo int,
+		@TempLedgNo numeric(18)
+
+set @SPVchTypeCode	=109 set @RPVchTypeCode=107 set @PayTypeNo=@PTypeNo
+Select  @CompNo=Firmno From Mfirm
+Declare @LedgerNo numeric(18),@VchDate datetime,@DiffAmt numeric(18,2),@RType int,@VchNo numeric(18),@BilledAmount numeric(18,2),
+		@TVchNo numeric(18),@CashLedgerNo numeric(18),@ID numeric(18),@VChD numeric(18)
+
+
+select TOP 1 @TVchNo=PKVoucherNo from TVoucherEntry where VoucherTypeCode = @RPVchTypeCode ORDER BY PkVoucherNo DESC
+Select @CashLedgerNo=LedgerNo from TVoucherDetails where FKVoucherNo = @TVchNo and VoucherSrNo=2 and Debit<>0 and srno=0
+
+Declare Cur Cursor For Select LedgerNo,VoucherDate,Sum(DayTotAmt) as Diff, Sum(rType) as totRType, Max(PkVoucherNo),sum(billedamount)as billedamount  FROM 
+				(SELECT     TVoucherDetails.LedgerNo, TVoucherEntry.VoucherDate, SUM(Case When TVoucherDetails.Debit<>0 Then TVoucherDetails.Debit else TVoucherDetails.Credit End) AS DayTotAmt, 1 as rType, 0 as PkVoucherNo  , SUM(billedamount) AS billedamount
+				FROM         TVoucherEntry INNER JOIN TVoucherDetails ON TVoucherEntry.PkVoucherNo = TVoucherDetails.FkVoucherNo 
+				WHERE     (TVoucherDetails.SrNo = 501) AND (TVoucherEntry.IsCancel = 'False')  --AND (TVoucherDetails.LedgerNo = 18391) 
+and (TVoucherEntry.VoucherTypeCode = @SPVchTypeCode) AND (TVoucherEntry.PayTypeNo = @PayTypeNo) 
+				GROUP BY TVoucherDetails.LedgerNo, TVoucherEntry.VoucherDate 
+				UNION ALL 
+				SELECT     TVoucherDetails.LedgerNo, TVoucherEntry.VoucherDate, SUM(Case When TVoucherDetails.Debit<>0 Then TVoucherDetails.Debit else TVoucherDetails.Credit End) * - 1 AS DayTotAmt, 2 as rType, MIN(TVoucherEntry.PkVoucherNo) as PkVoucherNo , 0 AS billedamount
+				FROM         TVoucherEntry INNER JOIN TVoucherDetails ON TVoucherEntry.PkVoucherNo = TVoucherDetails.FkVoucherNo 
+				WHERE     (TVoucherDetails.SrNo = 501) AND (TVoucherEntry.IsCancel = 'False')-- and (TVoucherDetails.LedgerNo = 18391)
+ AND (TVoucherEntry.VoucherTypeCode = @RPVchTypeCode) AND (TVoucherEntry.PayTypeNo = @PayTypeNo) 
+				GROUP BY TVoucherDetails.LedgerNo, TVoucherEntry.VoucherDate 
+				) As Tbl1 GROUP BY LedgerNo,VoucherDate 
+				HAVING Sum(DayTotAmt) <> 0 ORDER BY LedgerNo,VoucherDate
+Open Cur
+Fetch Next From Cur Into @LedgerNo ,@VchDate ,@DiffAmt ,@RType ,@VchNo,@BilledAmount
+While(@@Fetch_Status = 0)
+Begin
+	if(@RType=1)
+	Begin
+		Exec AddTVoucherEntry 0,@RPVchTypeCode,0,@VChDate,@VchDate,'Payment ','',0,'01-Jan-1900',@CompNo,@DiffAmt,
+								'','',0,0,1,@PayTypeNo,0,0,2,0,@VchDate,0,0,0,0,0,'false','false',0,0,'01-Jan-1900',0,0,0,'',0,0,0,0,0,0,0,@ID output
+		Select @TempLedgNo=LedgerNo From MPayTypeLedger Where PayTypeNo=@PayTypeNo
+		if(@RPVchTypeCode=111)
+		Begin
+			Exec AddTVoucherDetails 0,@ID,1,2,@LedgerNo,0,@DiffAmt,501,@CompNo,'',@VChD output
+			Exec AddTVoucherDetails 0,@ID,2,1,@TempLedgNo,@DiffAmt,0,0,@CompNo,'',@VChD output
+		End
+		else if(@RPVchTypeCode=107)
+		Begin
+			Exec AddTVoucherDetails 0,@ID,1,1,@LedgerNo,@DiffAmt,0,501,@CompNo,'',@VChD output
+			Exec AddTVoucherDetails 0,@ID,2,2,@TempLedgNo,0,@DiffAmt,0,@CompNo,'',@VChD output
+		End
+	End
+	else 
+	Select @RType
+	if(@RType=2)
+	Begin
+		
+		Exec DeleteAllVoucherEntry @VchNo
+	End
+	else if(@RType=3)
+	Begin
+			if(@RPVchTypeCode=111)
+			Begin			
+				UPDATE TVoucherDetails SET Credit = Credit + @DiffAmt Where FkVoucherNo = @VchNo AND SrNo = 501 AND VoucherSrNo = 1
+				UPDATE TVoucherDetails SET Debit = Debit + @DiffAmt Where FkVoucherNo = @VchNo AND SrNo = 0 AND VoucherSrNo = 2
+			End
+			Else if(@RPVchTypeCode=107)
+			Begin			
+				UPDATE TVoucherDetails SET Debit = Debit + @DiffAmt Where FkVoucherNo = @VchNo AND SrNo = 501 AND VoucherSrNo = 1
+				UPDATE TVoucherDetails SET Credit = Credit + @DiffAmt Where FkVoucherNo = @VchNo AND SrNo = 0 AND VoucherSrNo = 2
+			End
+Update TVoucherEntry set billedamount=@BilledAmount where  PkVoucherNo = @VchNo
+
+--			UPDATE TVoucherEntry SET BilledAmount = BilledAmount + @DiffAmt
+--            Where PkVoucherNo = @VchNo
+            
+	End
+		
+	Fetch Next From Cur Into @LedgerNo ,@VchDate ,@DiffAmt ,@RType ,@VchNo,@BilledAmount
+End
+Close Cur Deallocate Cur
+
+
+
+
+
+
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+
+

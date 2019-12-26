@@ -1,0 +1,275 @@
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[AddTVoucherEntry]
+     @PkVoucherNo                         numeric(18),
+     @VoucherTypeCode                     numeric(18),
+     @VoucherUserNo                       numeric(18),
+     @VoucherDate                         datetime,
+     @VoucherTime                         datetime,
+     @Narration                           varchar(50),
+     @Reference                           varchar(50),
+     @ChequeNo                            numeric(18),
+     @ClearingDate                        datetime,
+     @CompanyNo                           numeric(18),
+     @BilledAmount                        numeric(18,2),
+	 @ChallanNo                           varchar(50),
+	 @Remark                              varchar(Max),
+	 @InwardLocationCode				  numeric(18),
+	 @MacNo								  numeric(18),
+	 @UserID                              numeric(18),
+	 @PayTypeNo							  numeric(18),
+	 @RateTypeNo						  numeric(18),
+	 @TaxTypeNo							  numeric(18),
+	 @TaxInvoiceTypeNo					  numeric(18),
+	 @OrderType							  numeric(18),	
+     @UserDate                            datetime,
+	 @ReturnAmount						  numeric(18,2),
+     @Visibility						  numeric(18,2),
+	 @DiscPercent						  numeric(18,2),
+	 @DiscAmt								  numeric(18,2),
+	 @MixMode							  int,
+	 @IsItemLevelDisc					  bit,
+	 @IsFooterLevelDisc					  bit,
+	 @BrokerNo							  numeric(18),
+	 @SuppCategory						  numeric(18),
+	 @EffectiveDate						  datetime,
+	-- @ExcisePercentage					  numeric(18,2),
+	-- @IsExciseBill						  bit,
+	 @IsBillMulti						  int,
+	 @TransporterCode                     numeric(18),
+     @TransPayType                        numeric(18),
+     @LRNo                                varchar(50),
+     @TransportMode                       numeric(18),
+     @TransNoOfItems                      numeric(18),
+	 @ChrgesTaxPerce					  numeric(18,2),
+	 @LedgerNo							  numeric(18),
+     @StateCode							  numeric(18),
+     @TaxAmount 						  numeric(18),
+@PkRefNo				 numeric(18),
+     @ReturnID							  int output
+AS
+		Declare @TempPayTypeNo numeric(18), @TempTaxInvoiceTypeNo numeric(18),@TempTaxTypeNo numeric(18)
+
+IF EXISTS(select PkVoucherNo from TVoucherEntry
+          where
+          PkVoucherNo = @PkVoucherNo)
+     BEGIN
+--if( (Select SettingValue From MSettings where PkSettingNo =361) = 'true' and @VoucherTypeCode=15)--(Select SettingValue From MSettings where PkSettingNo =306) = 'false' AND
+--		begin
+--				
+----						Select @VoucherUserNo=IsNull(Max(Cast(VoucherUserNo as numeric)),0)+1 
+----      from TVoucherEntry where VoucherTypeCode=@VoucherTypeCode  AND (VoucherDate = @VoucherDate)
+----				
+--		End
+       --Update existing row
+       UPDATE TVoucherEntry
+       SET
+          VoucherTypeCode = @VoucherTypeCode,
+          VoucherUserNo = @VoucherUserNo,
+          VoucherDate = @VoucherDate,
+          VoucherTime = @VoucherTime,
+          Narration = @Narration,
+          Reference = @Reference,
+          ChequeNo = @ChequeNo,
+          ClearingDate = @ClearingDate,
+          CompanyNo = @CompanyNo,
+          BilledAmount = @BilledAmount,
+		  ChallanNo = @ChallanNo,
+		  Remark = @Remark,
+		  InwardLocationCode = @InwardLocationCode,
+		  MacNo=@MacNo,
+		  PayTypeNo = @PayTypeNo, 
+		  RateTypeNo = @RateTypeNo,
+		  TaxTypeNo = @TaxTypeNo,
+		  TaxInvoiceTypeNo = @TaxInvoiceTypeNo,
+		  VoucherStatus = 2,
+	      OrderType=@OrderType,
+	      ReturnAmount=@Returnamount,
+          Visibility=@Visibility,
+		  DiscPercent = @DiscPercent,
+		  DiscAmt = @DiscAmt,
+		  StatusNo = 2,
+		  MixMode = @MixMode,
+		  IsItemLevelDisc = @IsItemLevelDisc,
+		  IsFooterLevelDisc = @IsFooterLevelDisc,
+		  BrokerNo=@BrokerNo,
+		  SuppCategory=@SuppCategory,
+		  EffectiveDate = @EffectiveDate,
+		--  ExcisePercentage = @ExcisePercentage,
+		--  IsExciseBill = @IsExciseBill,
+		  IsBillMulti = @IsBillMulti,
+		  TransporterCode = @TransporterCode,
+          TransPayType = @TransPayType,
+          LRNo = @LRNo,
+          TransportMode = @TransportMode,
+          TransNoOfItems = @TransNoOfItems,	
+		  ChrgesTaxPerce = @ChrgesTaxPerce,
+          LedgerNo=@LedgerNo,
+          StateCode= @StateCode,
+          TaxAmount=@TaxAmount,
+PkRefNo=@PkRefNo,
+          ModifiedBy = isnull(ModifiedBy,'') + cast(@UserID as varchar)+'@'+ CONVERT(VARCHAR(10), GETDATE(), 105)
+       WHERE
+          PkVoucherNo = @PkVoucherNo
+		set @ReturnID=@PkVoucherNo    
+
+     END
+ELSE
+     BEGIN
+       --Insert new row
+       Declare @Id numeric, @AccYear int, @Month int
+       SELECT @Id=IsNull(Max(PkVoucherNo),0) From TVoucherEntry
+       DBCC CHECKIDENT('TVoucherEntry', RESEED, @Id)
+
+       if (@VoucherTypeCode = 9 or @VoucherTypeCode = 12 or @VoucherTypeCode = 13 or @VoucherTypeCode = 15 or @VoucherTypeCode = 109 or @VoucherTypeCode = 112 or @VoucherTypeCode = 113 or @VoucherTypeCode = 115)
+			begin
+				set @Month=Month(@VoucherDate)
+				set @AccYear = Year(@VoucherDate)
+				if(@Month < 4)
+						Set @AccYear = @AccYear - 1;
+				
+				if(@VoucherTypeCode=9)
+				Begin
+					if(@BrokerNo=0)
+						Select @VoucherUserNo=IsNull(Max(Cast(VoucherUserNo as numeric)),0)+1 from TVoucherEntry 
+						where VoucherTypeCode=@VoucherTypeCode AND VoucherDate >= cast( '1-Apr-' + cast(@AccYear as varchar)  as datetime) 
+						AND VoucherDate <= cast( '31-Mar-' + cast((@AccYear+1)as varchar)  as datetime) AND BrokerNo=0
+					else 
+						Select @VoucherUserNo=IsNull(Max(Cast(VoucherUserNo as numeric)),0)+1 from TVoucherEntry 
+						where VoucherTypeCode=@VoucherTypeCode AND VoucherDate >= cast( '1-Apr-' + cast(@AccYear as varchar)  as datetime) 
+						AND VoucherDate <= cast( '31-Mar-' + cast((@AccYear+1)as varchar)  as datetime) AND BrokerNo<>0
+				End
+				Else if(@SuppCategory!=1)
+				Begin
+---==============umesh for day wise series
+if( (Select SettingValue From MSettings where PkSettingNo =361) = 'true'  and @VoucherTypeCode=15)--(Select SettingValue From MSettings where PkSettingNo =306) = 'false' AND
+		begin
+				
+						Select @VoucherUserNo=IsNull(Max(Cast(VoucherUserNo as numeric)),0)+1 from TVoucherEntry where VoucherTypeCode=@VoucherTypeCode  AND (VoucherDate = @VoucherDate)
+				
+		End
+else
+
+					Select @VoucherUserNo=IsNull(Max(Cast(VoucherUserNo as numeric)),0)+1 from TVoucherEntry 
+					where VoucherTypeCode=@VoucherTypeCode AND VoucherDate >= cast( '1-Apr-' + cast(@AccYear as varchar)  as datetime) 
+					AND VoucherDate <= cast( '31-Mar-' + cast((@AccYear+1)as varchar)  as datetime) 
+end
+            end
+		 else if (@VoucherUserNo=0)
+			Select @VoucherUserNo=IsNull(Max(Cast(VoucherUserNo as numeric)),0)+1 from TVoucherEntry where VoucherTypeCode=@VoucherTypeCode
+			--select @PkVoucherNo=IsNull(Max(Cast(PkVoucherNo as numeric)),0)+1 from TvoucherEntry
+
+ELSE IF (@VoucherTypeCode = 1 or @VoucherTypeCode = 5 or @VoucherTypeCode = 33 or @VoucherTypeCode = 34 OR @VoucherTypeCode = 27)
+			Select @VoucherUserNo=IsNull(Max(Cast(VoucherUserNo as numeric)),0)+1 from TVoucherEntry where VoucherTypeCode=@VoucherTypeCode
+
+
+       INSERT INTO TVoucherEntry(
+          VoucherTypeCode,
+          VoucherUserNo,
+          VoucherDate,
+          VoucherTime,
+          Narration,
+          Reference,
+          ChequeNo,
+          ClearingDate,
+          CompanyNo,
+          BilledAmount,
+		  ChallanNo,
+          Remark,
+		  InwardLocationCode,
+		  MacNo,
+		  IsVoucherLock,
+		  IsCancel,
+		  PayTypeNo,
+		  RateTypeNo,
+		  TaxTypeNo,
+		  TaxInvoiceTypeNo,
+		  VoucherStatus,
+		  OrderType,
+		  ReturnAmount,
+	      Visibility,
+		  DiscPercent,
+		  DiscAmt,
+		  UserID,
+          UserDate,
+		  StatusNo,
+		  MixMode,
+		  IsItemLevelDisc,
+		  IsFooterLevelDisc,
+		  BrokerNo,
+		  SuppCategory,
+		  EffectiveDate,
+		--  ExcisePercentage,
+		 -- IsExciseBill,
+		  IsBillMulti, 
+		  TransporterCode,
+          TransPayType,
+          LRNo,
+          TransportMode,
+          TransNoOfItems,
+		  ChrgesTaxPerce,
+          LedgerNo,
+          StateCode,
+          TaxAmount,PkRefNo
+         
+)
+       VALUES(
+          @VoucherTypeCode,
+          @VoucherUserNo,
+          @VoucherDate,
+          @VoucherTime,
+          @Narration,
+          @Reference,
+          @ChequeNo,
+          @ClearingDate,
+          @CompanyNo,
+          @BilledAmount,
+		  @ChallanNo,
+          @Remark,
+		  @InwardLocationCode,
+		  @MacNo,
+		  'false',
+		  'false',
+		  @PayTypeNo,
+		  @RateTypeNo,
+		  @TaxTypeNo,
+		  @TaxInvoiceTypeNo,
+		  1,
+		  @OrderType,
+          @ReturnAmount,
+		  @Visibility,
+		  @DiscPercent,
+		  @DiscAmt,
+		  @UserID,
+          @UserDate,
+		  1,
+		  @MixMode,
+		  @IsItemLevelDisc,
+          @IsFooterLevelDisc,
+		  @BrokerNo,
+		  @SuppCategory,
+          @EffectiveDate,
+		 -- @ExcisePercentage,
+		 -- @IsExciseBill,
+		  @IsBillMulti,
+		  @TransporterCode,
+          @TransPayType,
+          @LRNo,
+          @TransportMode,
+          @TransNoOfItems,
+		  @ChrgesTaxPerce,
+   @LedgerNo,
+          @StateCode,
+          @TaxAmount,@PkRefNo
+)
+Set @ReturnID=Scope_Identity()
+END
+
+
+
+
+
+
+
+

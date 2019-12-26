@@ -1,0 +1,9 @@
+INSERT INTO [Yadi2018].[dbo].[MLanguage]
+           ([LanguageName]
+           ,[FontName]
+           ,[FontSize]
+           ,[FontBold]
+           ,[CompanyNo]
+           ,[StatusNo])
+     VALUES
+           ('Karnataka','Nudi 01 e',16,'False',1,3)

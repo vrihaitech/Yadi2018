@@ -1,0 +1,36 @@
+
+GO
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+create FUNCTION [dbo].[GetOpeningLedgerBalanceOnlyES]
+	(
+	@LedgerNo	numeric(18),
+	@CompNo		numeric(18)
+	)
+RETURNS @TLedgerBal Table(OpAmt numeric(18,2))
+AS
+BEGIN
+	Declare @DrAmt numeric(18,2),@CrAmt numeric(18,2)
+	Declare @BalAmt numeric(18,2),@Res int
+
+	Set @DrAmt = 0 Set @CrAmt = 0 set @Res=0
+
+	SELECT    @DrAmt= IsNull(SUM(TVoucherDetails.Debit),0), @CrAmt=IsNull(SUM(TVoucherDetails.Credit),0)
+		FROM         TVoucherDetails INNER JOIN
+							  TVoucherEntry ON TVoucherDetails.FKVoucherNo = TVoucherEntry.PKVoucherNo INNER JOIN
+							  MLedger ON TVoucherDetails.LedgerNo = MLedger.LedgerNo
+		WHERE     (TVoucherDetails.LedgerNo = @LedgerNo)  AND 
+				  (TVoucherEntry.CompanyNo = @CompNo) AND (TVoucherEntry.IsCancel='false') AND
+				  (TVoucherEntry.VoucherTypeCode = 136) -- 36 = OpeningBalance
+	                   
+	set @BalAmt = (@DrAmt - @CrAmt)
+	insert into @TLedgerBal values(@BalAmt)
+	
+	RETURN
+END
+
+
+

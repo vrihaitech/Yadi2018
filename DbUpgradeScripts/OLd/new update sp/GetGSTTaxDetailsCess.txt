@@ -1,0 +1,388 @@
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[GetGSTTaxDetailsCess] 
+	@FromDate datetime,
+	@ToDate datetime,
+	@Type numeric(18),
+	@VchType numeric(18),
+	@DiscLedg varchar(max),
+	@ChargesLedg varchar(max),
+	@RoundOffLedgNo numeric(18),
+	@TaxTypeNo	numeric(18)
+AS
+BEGIN
+	Declare @PerTable Table(TempPer numeric(18,2),ColNo numeric(18))
+	Declare @ColName numeric(18,2),@Cnt numeric(18),@DocNo numeric(18),@Date datetime,@Amt numeric(18,2),@Per numeric(18,2),
+			@Pk numeric(18),@TotTax numeric(18,2), @TotAmt numeric(18,2),@TotAmt2 numeric(18,2),@TaxToal numeric(18,2),@AmtTotal numeric(18,2),
+			@FinalAmount numeric(18,2),@StrQry varchar(max),@TempPer numeric(18,2),@TaxAmt numeric(18,2),@TaxAmt2 numeric(18,2),@TaxAmt3 numeric(18,2),@TaxAmt4 numeric(18,2),@TempDate datetime,@GSTNO varchar(50),@HSNCode varchar(50),@StateName varchar(100),@UomName varchar(50),@ItemNo numeric(18)
+	Declare @Month varchar(20),@MNo int ,@TDate datetime ,@Yr int,@FrDate datetime,@TempPk numeric(18),@TempColNo numeric(18),
+			@SGSTAmount numeric(18,2),@SGSTAmount2 numeric(18,2),@SGSTAmount3 numeric(18,2),@SGSTAmount4 numeric(18,2),@TempDocNo numeric(18),@Disc numeric(18,2),@Charges numeric(18,2),@RndOff numeric(18,2),@LedgerName varchar(max)
+	Declare @TVal Table(DocNo numeric(18),Date datetime,LedgerName varchar(max),GSTNO varchar(50),HSNCode varchar(50),StateName varchar(100),UomName varchar(50), FinalAmt numeric(18,2),Disc numeric(18,2),Charges numeric(18,2),RndOff numeric(18,2),SAmt1 numeric(18,2),TAmt1 numeric(18,2),TCAmt1 numeric(18,2),TIAmt1 numeric(18,2),TCeAmt1 numeric(18,2),
+			SAmt2 numeric(18,2),TAmt2 numeric(18,2),TCAmt2 numeric(18,2),TIAmt2 numeric(18,2),TCeAmt2 numeric(18,2),SAmt3 numeric(18,2),TAmt3 numeric(18,2),TCAmt3 numeric(18,2),TIAmt3 numeric(18,2),TCeAmt3 numeric(18,2),SAmt4 numeric(18,2),
+			TAmt4 numeric(18,2),TCAmt4 numeric(18,2),TIAmt4 numeric(18,2),TCeAmt4 numeric(18,2),SAmt5 numeric(18,2),TAmt5 numeric(18,2),TIAmt5 numeric(18,2),TCeAmt5 numeric(18,2),TCAmt5 numeric(18,2),TaxToal numeric(18,2),AmtTotal numeric(18,2),ItemNo numeric(18))
+	Declare @TDisc Table(LedgNo numeric(18))
+	Declare @TChrg Table(LedgNo numeric(18))
+	
+
+	set @Cnt=0  set @TempPk=0 set @TaxToal =0 set @AmtTotal =0
+    set @Amt=0 set @Per=0 set @TotTax=0 set @TotAmt=0 set @Disc =0 set @Charges =0 set @RndOff =0
+	 set @StrQry='' set @FrDate=@FromDate set @TempColNo=0  set @TempDocNo=0 set @TempDate='01-01-1900'
+
+
+
+set @StrQry='Select distinct TStock.SGSTPercentage,0 FROM TVoucherEntry INNER JOIN
+								  TStock ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+								  WHERE TaxTypeNo= '+Cast(@TaxTypeNo as varchar)+' AND TVoucherEntry.VoucherTypeCode='+cast(@VchType as varchar)+'
+			and TVoucherEntry.VoucherDate>='''+cast(@FromDate as varchar)+''' and TVoucherEntry.iscancel= 0 
+and TVoucherEntry.VoucherDate<='''+cast(@ToDate as varchar)+''' order by TStock.SGSTPercentage'
+--(TStock.SGSTPercentage <> 0) and
+
+insert into @PerTable Exec(@StrQry) --select * from @PerTable
+
+insert into @TDisc Exec('Select LedgerNo From MLedger Where LedgerNo in ('+ @DiscLedg +')')
+insert into @TChrg Exec('Select LedgerNo From MLedger Where LedgerNo in ('+ @ChargesLedg +')')
+
+Declare CurCol Cursor for Select TempPer from @PerTable
+
+		open CurCol
+		Fetch next from CurCol into @TempPer
+		while (@@Fetch_Status=0)
+		Begin
+			
+			
+			set @Cnt=@Cnt+1	
+			update 	@PerTable set ColNo=@Cnt where 	TempPer=@TempPer
+			Fetch next from CurCol into @TempPer
+		End
+		Close CurCol Deallocate CurCol
+
+select * from @PerTable
+set @Cnt=0
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+if(@Type =2 )
+BEGIN
+Declare InsValue Cursor for SELECT     TVoucherEntry_1.VoucherUserNo, TVoucherEntry_1.VoucherDate, TStock.SGSTPercentage, TVoucherEntry_1.PkVoucherNo, 
+                      TVoucherEntry_1.BilledAmount, TStock.NetAmount AS SAmt1, TStock.SGSTAmount AS TAmt,TStock.CGSTAmount AS TCAmt,TStock.IGSTAmount AS TIAmt, TStock.CessAmount AS TCeAmt,  (TStock.DiscAmount+TStock.DiscRupees) as Disc,
+                          (SELECT     isNull(SUM(CASE WHEN (Debit <> 0) THEN Debit ELSE -Credit END),0) 
+                            FROM          TVoucherEntry AS TVoucherEntry_3 INNER JOIN
+                                                   TVoucherDetails AS TVoucherDetails_3 ON TVoucherEntry_3.PkVoucherNo = TVoucherDetails_3.FkVoucherNo
+                            WHERE      (TVoucherDetails_3.LedgerNo IN
+                                                       (@RoundOffLedgNo)) AND (TVoucherDetails_3.FkVoucherNo = TVoucherEntry_1.PkVoucherNo)) ,
+HSNCode,TStock.Itemno,
+                          (SELECT     isNull(SUM(CASE WHEN (Debit <> 0) THEN Debit ELSE Credit END),0)
+                            FROM          TVoucherEntry AS TVoucherEntry_2 INNER JOIN
+                                                   TVoucherDetails AS TVoucherDetails_2 ON TVoucherEntry_2.PkVoucherNo = TVoucherDetails_2.FkVoucherNo
+                            WHERE      (TVoucherDetails_2.LedgerNo IN
+                                                       (SELECT LedgNo FROM @TChrg)) AND (TVoucherDetails_2.FkVoucherNo = TVoucherEntry_1.PkVoucherNo)) 
+                     
+				FROM TVoucherEntry AS TVoucherEntry_1 INNER JOIN
+                     TStock ON TVoucherEntry_1.PkVoucherNo = TStock.FKVoucherNo  inner join MStockItems on TStock.itemno=MStockItems.itemno
+ inner join MUOM On Muom.UOMNo=TStock.FkUomNo
+				WHERE TVoucherEntry_1.VoucherTypeCode=@VchType	 and TVoucherEntry_1.VoucherDate>=@FromDate and TVoucherEntry_1.VoucherDate<=@ToDate  AND (TVoucherEntry_1.IsCancel = 'false')
+					  AND TVoucherEntry_1.TaxTypeNo= @TaxTypeNo --and TVoucherEntry_1.PkVoucherNo=14246
+				--Group by TVoucherEntry_1.VoucherUserNo,MStockItems.HSNCode,TVoucherEntry_1.VoucherDate,TStock.SGSTPercentage,TVoucherEntry_1.PkVoucherNo,BilledAmount,TStock.NetAmount,TStock.SGSTAmount,TStock.CGSTAmount,TStock.DiscAmount,TStock.DiscRupees
+				order by TVoucherEntry_1.VoucherUserNo,TStock.SGSTPercentage
+
+		open InsValue
+		fetch next from InsValue into @DocNo,@Date,@Per,@Pk,@FinalAmount,@Amt,@SGSTAmount,@SGSTAmount2,@SGSTAmount3,@SGSTAmount4,@Disc,@RndOff,@HSNCode,@ItemNo,@Charges
+			While(@@Fetch_Status=0)
+				Begin
+						--Select @LedgerName=LedgerName FRom MLedger Where LedgerNo in(Select LedgerNo From TVoucherDetails Where FKVoucherNo=@Pk AND VoucherSrNo=1)
+						Select @LedgerName=LedgerName,@StateName=StateName,@GSTNO=Case When(IsNull(GSTNO,'NA')='') Then '' Else  IsNull(GSTNO,'') end FRom MLedger inner Join MLedgerDetails On MLedger.LedgerNo=MLedgerDetails.LedgerNo inner join MState on MLedgerDetails.Stateno=MState.Stateno Where MLedger.LedgerNo in(Select LedgerNo From TVoucherDetails Where FKVoucherNo=@Pk AND VoucherSrNo=1)
+					
+							set @TempPk=@Pk
+							insert into @TVal (DocNo ,Date ,LedgerName,GSTNO, FinalAmt,Disc ,Charges ,RndOff, HSNCode,StateName,Itemno,SAmt1,TAmt1,TCAmt1,TIAmt1,TCeAmt1,SAmt2,TAmt2,TCAmt2,TIAmt2,TCeAmt2,SAmt3,TAmt3,TCAmt3,TIAmt3,TCeAmt3,SAmt4,TAmt4,TCAmt4,TIAmt4,TCeAmt4,SAmt5,TAmt5,TCAmt5,TIAmt5,TCeAmt5) 
+                            Values(@DocNo,@Date,@LedgerName,@GSTNO,@FinalAmount ,@Disc,@Charges,@RndOff,@HSNCode,@StateName,@ItemNo,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+							set @Cnt=@Cnt+1	
+
+						select @TempColNo=ColNo from @PerTable where TempPer=@Per
+
+						if (@TempColNo = 1)
+							update @TVal set SAmt1 = @Amt , TAmt1 = @SGSTAmount , TCAmt1 = @SGSTAmount2 , TIAmt1 = @SGSTAmount3, TCeAmt1 = @SGSTAmount4 where DocNo = @DocNo and Itemno=@ItemNo
+						if (@TempColNo = 2)
+							update @TVal set SAmt2 = @Amt , TAmt2 = @SGSTAmount , TCAmt2 = @SGSTAmount2, TIAmt2 = @SGSTAmount3, TCeAmt2 = @SGSTAmount4  where DocNo = @DocNo and Itemno=@ItemNo
+						if (@TempColNo = 3)
+							update @TVal set SAmt3 = @Amt , TAmt3 = @SGSTAmount , TCAmt3 = @SGSTAmount2 , TIAmt3 = @SGSTAmount3 , TCeAmt3 = @SGSTAmount4  where DocNo = @DocNo and Itemno=@ItemNo
+						if (@TempColNo = 4)
+							update @TVal set SAmt4 = @Amt , TAmt4 = @SGSTAmount , TCAmt4 = @SGSTAmount2 , TIAmt4 = @SGSTAmount3, TCeAmt4 = @SGSTAmount4 where DocNo = @DocNo and Itemno=@ItemNo
+						if (@TempColNo = 5)
+						update @TVal set SAmt5 = @Amt , TAmt5 = @SGSTAmount , TCAmt5 = @SGSTAmount2 , TIAmt5 = @SGSTAmount3 , TCeAmt5 = @SGSTAmount4  where DocNo = @DocNo and Itemno=@ItemNo
+						set @TaxToal =@TaxToal+@SGSTAmount+@SGSTAmount2+@SGSTAmount3+@SGSTAmount4
+					   set @AmtTotal =@AmtTotal+@Amt
+					   set @TempDocNo=@DocNo
+
+
+--if (@@Fetch_Status=0)
+					fetch next from InsValue into @DocNo,@Date,@Per,@Pk,@FinalAmount,@Amt,@SGSTAmount,@SGSTAmount2,@SGSTAmount3,@SGSTAmount4,@Disc,@RndOff,@HSNCode,@ItemNo,@Charges
+				End
+
+close InsValue deallocate InsValue
+if(@TempPk<>0)
+							BEGIN
+							update @TVal set TaxToal=@TaxToal,AmtTotal=@AmtTotal where DocNo = @TempDocNo and Itemno=@ItemNo
+							set @AmtTotal =0 set @TaxToal =0
+							set @TempDocNo=@DocNo
+							END
+End
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+if(@Type =1 )
+BEGIN
+Declare InsValue Cursor for SELECT    case when @VchType=15 then   TVoucherEntry_1.VoucherUserNo else TVoucherEntry_1.Reference end as VoucherUserNo, TVoucherEntry_1.VoucherDate, TStock.SGSTPercentage, TVoucherEntry_1.PkVoucherNo, 
+                      TVoucherEntry_1.BilledAmount, SUM(TStock.NetAmount) AS SAmt, SUM(TStock.SGSTAmount) AS TAmt,SUM(TStock.CGSTAmount) AS TCAmt,SUM(TStock.IGSTAmount) AS TCAmt,SUM(TStock.CessAmount) AS TCAmt,sum(TStock.DiscAmount+TStock.DiscRupees) as Disc,
+--                          (SELECT     isNull(SUM(CASE WHEN (Debit <> 0) THEN Debit ELSE Credit END),0) 
+--                            FROM          TVoucherEntry INNER JOIN
+--                                                   TVoucherDetails ON TVoucherEntry.PkVoucherNo = TVoucherDetails.FkVoucherNo
+--                            WHERE      (TVoucherDetails.LedgerNo IN
+--                                                       (SELECT LedgNo FROM @TDisc )) AND (TVoucherDetails.FkVoucherNo = TVoucherEntry_1.PkVoucherNo)) ,
+                        
+                          (SELECT     isNull(SUM(CASE WHEN (Debit <> 0) THEN Debit ELSE -Credit END),0) 
+                            FROM          TVoucherEntry AS TVoucherEntry_3 INNER JOIN
+                                                   TVoucherDetails AS TVoucherDetails_3 ON TVoucherEntry_3.PkVoucherNo = TVoucherDetails_3.FkVoucherNo
+                            WHERE      (TVoucherDetails_3.LedgerNo IN
+                                                       (@RoundOffLedgNo)) AND (TVoucherDetails_3.FkVoucherNo = TVoucherEntry_1.PkVoucherNo)) ,
+                          (SELECT     isNull(SUM(CASE WHEN (Debit <> 0) THEN Debit ELSE Credit END),0)
+                            FROM          TVoucherEntry AS TVoucherEntry_2 INNER JOIN
+                                                   TVoucherDetails AS TVoucherDetails_2 ON TVoucherEntry_2.PkVoucherNo = TVoucherDetails_2.FkVoucherNo
+                            WHERE      (TVoucherDetails_2.LedgerNo IN
+                                                       (SELECT LedgNo FROM @TChrg)) AND (TVoucherDetails_2.FkVoucherNo = TVoucherEntry_1.PkVoucherNo)) 
+                     
+				FROM TVoucherEntry AS TVoucherEntry_1 INNER JOIN
+                     TStock ON TVoucherEntry_1.PkVoucherNo = TStock.FKVoucherNo 
+				WHERE TVoucherEntry_1.VoucherTypeCode=@VchType	 and TVoucherEntry_1.VoucherDate>=@FromDate and TVoucherEntry_1.VoucherDate<=@ToDate  AND (TVoucherEntry_1.IsCancel = 'false')
+					  AND TVoucherEntry_1.TaxTypeNo= @TaxTypeNo
+				Group by TVoucherEntry_1.VoucherUserNo,Reference,TVoucherEntry_1.VoucherDate,TStock.SGSTPercentage,TVoucherEntry_1.PkVoucherNo,BilledAmount
+				order by TVoucherEntry_1.VoucherUserNo,TStock.SGSTPercentage
+
+		open InsValue
+		fetch next from InsValue into @DocNo,@Date,@Per,@Pk,@FinalAmount,@Amt,@SGSTAmount,@SGSTAmount2,@SGSTAmount3,@SGSTAmount4,@Disc,@RndOff,@Charges
+			While(@@Fetch_Status=0)
+				Begin
+						--Select @LedgerName=LedgerName FRom MLedger Where LedgerNo in(Select LedgerNo From TVoucherDetails Where FKVoucherNo=@Pk AND VoucherSrNo=1)
+						Select @LedgerName=LedgerName,@GSTNO=Case When(IsNull(GSTNO,'NA')='') Then '' Else  IsNull(GSTNO,'') end FRom MLedger inner Join MLedgerDetails On MLedger.LedgerNo=MLedgerDetails.LedgerNo Where MLedger.LedgerNo in(Select LedgerNo From TVoucherDetails Where FKVoucherNo=@Pk AND VoucherSrNo=1)
+					
+                    if(@TempPk<>@Pk)
+						BEgin
+							if(@TempPk<>0)
+							BEGIN								
+							update @TVal set TaxToal=@TaxToal,AmtTotal=@AmtTotal where DocNo = @TempDocNo							
+							set @AmtTotal =0 set @TaxToal =0
+							set @TempDocNo=@DocNo
+							END
+--							if(@Cnt>2000)
+--							BEGIn
+--								Select * from @TVal
+--								Delete from @TVal
+--								set @Cnt=0
+--							END
+							set @TempPk=@Pk
+							insert into @TVal (DocNo ,Date ,LedgerName,GSTNO, FinalAmt,Disc ,Charges ,RndOff ,SAmt1,TAmt1,TCAmt1,TIAmt1,TCeAmt1,SAmt2,TAmt2,TCAmt2,TIAmt2,TCeAmt2,SAmt3,TAmt3,TCAmt3,TIAmt3,TCeAmt3,SAmt4,TAmt4,TCAmt4,TIAmt4,TCeAmt4,SAmt5,TAmt5,TCAmt5,TIAmt5,TCeAmt5) 
+                            Values(@DocNo,@Date,@LedgerName,@GSTNO,@FinalAmount ,@Disc,@Charges,@RndOff,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+							set @Cnt=@Cnt+1	
+						End
+						select @TempColNo=ColNo from @PerTable where TempPer=@Per
+
+						if (@TempColNo = 1)
+							update @TVal set SAmt1 = @Amt , TAmt1 = @SGSTAmount , TCAmt1 = @SGSTAmount2 , TIAmt1 = @SGSTAmount3, TCeAmt1 = @SGSTAmount4 where DocNo = @DocNo
+						if (@TempColNo = 2)
+							update @TVal set SAmt2 = @Amt , TAmt2 = @SGSTAmount , TCAmt2 = @SGSTAmount2 , TIAmt2 = @SGSTAmount3, TCeAmt2 = @SGSTAmount4 where DocNo = @DocNo
+						if (@TempColNo = 3)
+							update @TVal set SAmt3 = @Amt , TAmt3 = @SGSTAmount , TCAmt3 = @SGSTAmount2 , TIAmt3 = @SGSTAmount3 , TCeAmt3 = @SGSTAmount4 where DocNo = @DocNo
+						if (@TempColNo = 4)
+							update @TVal set SAmt4 = @Amt , TAmt4 = @SGSTAmount , TCAmt4 = @SGSTAmount2 , TIAmt4 = @SGSTAmount3, TCeAmt4 = @SGSTAmount4 where DocNo = @DocNo
+						if (@TempColNo = 5)
+							update @TVal set SAmt5 = @Amt , TAmt5 = @SGSTAmount , TCAmt5 = @SGSTAmount2 , TIAmt5 = @SGSTAmount3 , TCeAmt5 = @SGSTAmount4 where DocNo = @DocNo
+						set @TaxToal =@TaxToal+@SGSTAmount+@SGSTAmount2+@SGSTAmount3+@SGSTAmount4
+						set @AmtTotal =@AmtTotal+@Amt
+						set @TempDocNo=@DocNo
+					fetch next from InsValue into @DocNo,@Date,@Per,@Pk,@FinalAmount,@Amt,@SGSTAmount,@SGSTAmount2,@SGSTAmount3,@SGSTAmount4,@Disc,@RndOff,@Charges
+				End
+
+close InsValue deallocate InsValue
+if(@TempPk<>0)
+							BEGIN
+							update @TVal set TaxToal=@TaxToal,AmtTotal=@AmtTotal where DocNo = @TempDocNo
+							set @AmtTotal =0 set @TaxToal =0
+							set @TempDocNo=@DocNo
+							END
+End
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+if(@Type=3)
+Begin
+	Declare InsValue Cursor for SELECT     Count(TVoucherEntry_1.PkVoucherNo) as DocNo, TVoucherEntry_1.VoucherDate, -1 as SGSTPercentage,
+                      SUM(TVoucherEntry_1.BilledAmount) AS SAmt, 0 as  TAmt,
+                          (SELECT     isNull(SUM(CASE WHEN (Debit <> 0) THEN Debit ELSE Credit END),0) 
+                            FROM          TVoucherEntry INNER JOIN
+                                                   TVoucherDetails ON TVoucherEntry.PkVoucherNo = TVoucherDetails.FkVoucherNo
+                            WHERE      (TVoucherDetails.LedgerNo IN
+                                                       (SELECT LedgNo FROM @TDisc)) AND (TVoucherEntry.VoucherDate=TVoucherEntry_1.VoucherDate) AND (TVoucherEntry.VoucherTypeCode=@VchType)) as Disc,
+                          (SELECT     isNull(SUM(CASE WHEN (Debit <> 0) THEN Debit ELSE -Credit END),0) 
+                            FROM          TVoucherEntry AS TVoucherEntry_3 INNER JOIN
+                                                   TVoucherDetails AS TVoucherDetails_3 ON TVoucherEntry_3.PkVoucherNo = TVoucherDetails_3.FkVoucherNo
+                            WHERE      (TVoucherDetails_3.LedgerNo IN
+                                                       (@RoundOffLedgNo)) AND (TVoucherEntry_3.VoucherDate=TVoucherEntry_1.VoucherDate) AND (TVoucherEntry_3.VoucherTypeCode=@VchType)) as RndOff,
+                          (SELECT     isNull(SUM(CASE WHEN (Debit <> 0) THEN Debit ELSE Credit END),0)
+							 FROM  TVoucherEntry AS TVoucherEntry_2 INNER JOIN TVoucherDetails AS TVoucherDetails_2 ON TVoucherEntry_2.PkVoucherNo = TVoucherDetails_2.FkVoucherNo
+                            WHERE      (TVoucherDetails_2.LedgerNo IN (SELECT LedgNo FROM @TChrg)) AND (TVoucherEntry_2.VoucherDate=TVoucherEntry_1.VoucherDate) AND (TVoucherEntry_2.VoucherTypeCode=@VchType)) as Charges
+                     
+			FROM         TVoucherEntry AS TVoucherEntry_1 
+								 WHERE      TVoucherEntry_1.VoucherTypeCode=@VchType	 and TVoucherEntry_1.VoucherDate>=@FromDate and TVoucherEntry_1.VoucherDate<=@ToDate AND (TVoucherEntry_1.IsCancel = 'false')
+										AND TVoucherEntry_1.TaxTypeNo= @TaxTypeNo
+								Group by TVoucherEntry_1.VoucherDate					
+			Union all
+			SELECT     0 as DocNo,TVoucherEntry_1.VoucherDate, TStock.SGSTPercentage,SUM(TStock.NetAmount) AS SAmt, SUM(TStock.SGSTAmount) AS TAmt,
+									   0 as Disc ,0 as RndOff ,0 as Charges                     
+			FROM         TVoucherEntry AS TVoucherEntry_1 INNER JOIN
+								  TStock ON TVoucherEntry_1.PkVoucherNo = TStock.FKVoucherNo 
+								 WHERE      TVoucherEntry_1.VoucherTypeCode=@VchType	 and TVoucherEntry_1.VoucherDate>=@FromDate and TVoucherEntry_1.VoucherDate<=@ToDate  AND (TVoucherEntry_1.IsCancel = 'false')
+										AND TVoucherEntry_1.TaxTypeNo= @TaxTypeNo
+								Group by TVoucherEntry_1.VoucherDate,TStock.SGSTPercentage
+			order by VoucherDate,SGSTPercentage
+		open InsValue
+		fetch next from InsValue into @DocNo,@Date,@Per,@Amt,@SGSTAmount,@Disc,@RndOff,@Charges
+			While(@@Fetch_Status=0)
+			Begin
+				if(@Per=-1)
+				Begin
+					if(@TempDate<>'01-01-1900')
+					Begin
+						update @TVal set TaxToal=@TaxToal,AmtTotal=@AmtTotal where Date = @TempDate
+						set @AmtTotal =0 set @TaxToal =0 set @TempDate=@Date					
+					End
+					insert into @TVal (DocNo ,Date ,LedgerName,FinalAmt,Disc ,Charges ,RndOff ,SAmt1,TAmt1,SAmt2,TAmt2,SAmt3,TAmt3,SAmt4,TAmt4,SAmt5,TAmt5) 
+                            Values(@DocNo,@Date,@LedgerName,@Amt,@Disc,@Charges,@RndOff,0,0,0,0,0,0,0,0,0,0 )
+				End
+				Else
+				Begin
+					select @TempColNo=ColNo from @PerTable where TempPer=@Per
+						if (@TempColNo = 1)
+							update @TVal set SAmt1 = @Amt , TAmt1 = @SGSTAmount where Date = @Date
+						if (@TempColNo = 2)
+							update @TVal set SAmt2 = @Amt , TAmt2 = @SGSTAmount where Date = @Date
+						if (@TempColNo = 3)
+							update @TVal set SAmt3 = @Amt , TAmt3 = @SGSTAmount where Date = @Date
+						if (@TempColNo = 4)
+							update @TVal set SAmt4 = @Amt , TAmt4 = @SGSTAmount where Date = @Date
+						if (@TempColNo = 5)
+							update @TVal set SAmt5 = @Amt , TAmt5 = @SGSTAmount where Date = @Date
+						set @TaxToal =@TaxToal+@SGSTAmount
+						set @AmtTotal =@AmtTotal+@Amt
+						set @TempDocNo=@DocNo
+						set @TempDate=@Date
+				
+				End
+				fetch next from InsValue into @DocNo,@Date,@Per,@Amt,@SGSTAmount,@Disc,@RndOff,@Charges
+			End
+close InsValue deallocate InsValue
+if(@TempDate<>'01-01-1900')
+					Begin
+						update @TVal set TaxToal=@TaxToal,AmtTotal=@AmtTotal where Date = @TempDate
+						set @AmtTotal =0 set @TaxToal =0 set @TempDate=@Date					
+					End		
+
+End
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+if(@Type=3)
+Begin
+	Begin
+			if((Select Count(*) from @PerTable)=1)			
+			select 'Quarter-'+Cast(datepart (q,Date) as varchar) as 'Quarter',Sum(cast (DocNo as numeric)) as 'TotalBills', sum(FinalAmt) as 'FinalAmt' ,sum(Disc) as 'Disc',sum(Charges) as 'Charges',sum(RndOff) as 'RndOff',sum(SAmt1) as 'SAmt1',sum(TAmt1) as 'TAmt1',sum(AmtTotal)as 'AmtTotal' ,sum(TaxToal) as 'TaxToal' from @TVal Group BY datepart (q,Date)
+			if((Select Count(*) from @PerTable)=2)
+			select 'Quarter-'+Cast(datepart (q,Date) as varchar) as 'Quarter',Sum(cast (DocNo as numeric)) as 'TotalBills', sum(FinalAmt) as 'FinalAmt' ,sum(Disc) as 'Disc',sum(Charges) as 'Charges',sum(RndOff) as 'RndOff',sum(SAmt1) as 'SAmt1',sum(TAmt1) as 'TAmt1',Sum(SAmt2) as 'SAmt2',sum(TAmt2) as 'TAmt2',sum(AmtTotal)as 'AmtTotal' ,sum(TaxToal) as 'TaxToal'  from @TVal Group BY datepart (q,Date)
+			if((Select Count(*) from @PerTable)=3)
+			select 'Quarter-'+Cast(datepart (q,Date) as varchar) as 'Quarter',Sum(cast (DocNo as numeric)) as 'TotalBills', sum(FinalAmt) as 'FinalAmt' ,sum(Disc) as 'Disc',sum(Charges) as 'Charges',sum(RndOff) as 'RndOff',sum(SAmt1) as 'SAmt1',sum(TAmt1) as 'TAmt1',Sum(SAmt2) as 'SAmt2',sum(TAmt2) as 'TAmt2' ,Sum(SAmt3) as 'SAmt3',sum(TAmt3) as 'TAmt3' ,sum(AmtTotal)as 'AmtTotal' ,sum(TaxToal) as 'TaxToal' from @TVal Group BY datepart (q,Date)
+			if((Select Count(*) from @PerTable)=4)
+			select 'Quarter-'+Cast(datepart (q,Date) as varchar) as 'Quarter',Sum(cast (DocNo as numeric)) as 'TotalBills', sum(FinalAmt) as 'FinalAmt' ,sum(Disc) as 'Disc',sum(Charges) as 'Charges',sum(RndOff) as 'RndOff',sum(SAmt1) as 'SAmt1',sum(TAmt1) as 'TAmt1',Sum(SAmt2) as 'SAmt2',sum(TAmt2) as 'TAmt2' ,Sum(SAmt3) as 'SAmt3',sum(TAmt3) as 'TAmt3',Sum(SAmt4) as 'SAmt4',sum(TAmt4) as 'TAmt4'  ,sum(AmtTotal)as 'AmtTotal' ,sum(TaxToal) as 'TaxToal' from @TVal Group BY datepart (q,Date)
+			if((Select Count(*) from @PerTable)=5)
+			select 'Quarter-'+Cast(datepart (q,Date) as varchar) as 'Quarter',Sum(cast (DocNo as numeric)) as 'TotalBills', sum(FinalAmt) as 'FinalAmt' ,sum(Disc) as 'Disc',sum(Charges) as 'Charges',sum(RndOff) as 'RndOff',sum(SAmt1) as 'SAmt1',sum(TAmt1) as 'TAmt1',Sum(SAmt2) as 'SAmt2',sum(TAmt2) as 'TAmt2' ,Sum(SAmt3) as 'SAmt3',sum(TAmt3) as 'TAmt3',Sum(SAmt4) as 'SAmt4',sum(TAmt4) as 'TAmt4',Sum(SAmt5) as 'SAmt5',sum(TAmt5) as 'TAmt5' ,sum(AmtTotal)as 'AmtTotal' ,sum(TaxToal) as 'TaxToal'  from @TVal  Group BY datepart (q,Date)
+	End
+End
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+Else
+Begin
+	if(@Type=1 or @Type=2 )
+	Begin
+		
+		if((Select Count(*) from @PerTable)=1)
+		select Date,DocNo ,LedgerName,GSTNO, FinalAmt ,Disc ,Charges ,RndOff,SAmt1 ,TAmt1,TCAmt1,TIAmt1,TCeAmt1,AmtTotal ,TaxToal from @TVal
+		union All select null as Date, null as DocNo ,null,null, sum(FinalAmt) ,sum(Disc) ,sum(Charges) ,sum(RndOff),sum(SAmt1) ,sum(TAmt1),sum(TCAmt1),sum(TIAmt1),sum(TCeAmt1),sum(AmtTotal) ,sum(TaxToal) from @TVal
+		if((Select Count(*) from @PerTable)=2)
+		select Date,DocNo  ,LedgerName,GSTNO, FinalAmt ,Disc ,Charges ,RndOff,SAmt1 ,TAmt1,TCAmt1,TIAmt1,TCeAmt1,SAmt2 ,TAmt2,TCAmt2,TIAmt2 ,TCeAmt2 ,AmtTotal,TaxToal  from @TVal
+		union All select null as Date, null as DocNo ,null,null, sum(FinalAmt) ,sum(Disc) ,sum(Charges) ,sum(RndOff),sum(SAmt1) ,sum(TAmt1),sum(TCAmt1),sum(TIAmt1),sum(TCeAmt1),sum(SAmt2) ,sum(TAmt2),sum(TCAmt2),sum(TIAmt2),sum(TCeAmt2),sum(AmtTotal) ,sum(TaxToal) from @TVal
+		if((Select Count(*) from @PerTable)=3)
+		select Date,DocNo  ,LedgerName,GSTNO, FinalAmt ,Disc ,Charges ,RndOff,SAmt1 as AMT ,TAmt1 as SGST,TCAmt1 as CGST,TIAmt1 as IGST,TCeAmt1 as Cess,SAmt2 as AMT ,TAmt2 as SGST,TCAmt2 as CGST,TIAmt2 as IGST ,TCeAmt2 as Cess  ,SAmt3 as AMT ,TAmt3 as SGST ,TCAmt3 as CGST,TIAmt3 as IGST,TCeAmt3 as Cess,AmtTotal,TaxToal  from @TVal
+		union All select null as Date, null as DocNo ,null, null,sum(FinalAmt) ,sum(Disc) ,sum(Charges) ,sum(RndOff),sum(SAmt1) as AMT ,sum(TAmt1) as SGST,sum(TCAmt1) as CGST,sum(TIAmt1) as IGST,sum(TCeAmt1) as Cess,sum(SAmt2) ,sum(TAmt2),sum(TCAmt2),sum(TIAmt2),sum(TCeAmt2),sum(SAmt3) ,sum(TAmt3),sum(TCAmt3),sum(TIAmt3),sum(TCeAmt3),sum(AmtTotal) ,sum(TaxToal) from @TVal
+		if((Select Count(*) from @PerTable)=4)
+		--select Date,DocNo  , LedgerName,FinalAmt ,Disc ,Charges ,RndOff,SAmt1 ,TAmt1,SAmt2 ,TAmt2 ,SAmt3 ,TAmt3 ,SAmt4 ,TAmt4  ,AmtTotal,TaxToal from @TVal
+		--union All select null as Date, null as DocNo ,null, sum(FinalAmt) ,sum(Disc) ,sum(Charges) ,sum(RndOff),sum(SAmt1) ,sum(TAmt1),sum(SAmt2) ,sum(TAmt2),sum(SAmt3) ,sum(TAmt3),sum(SAmt4) ,sum(TAmt4),sum(AmtTotal) ,sum(TaxToal) from @TVal
+		select Date,DocNo  ,LedgerName,GSTNO, FinalAmt ,Disc ,Charges ,RndOff,SAmt1 ,TAmt1,TCAmt1,TIAmt1,TCeAmt1,SAmt2 ,TAmt2,TCAmt2,TIAmt2 ,TCeAmt2  ,SAmt3 ,TAmt3 ,TCAmt3,TIAmt3,TCeAmt3,SAmt4 ,TAmt4 ,TCAmt4,TIAmt4,TCeAmt4,AmtTotal,TaxToal  from @TVal
+		union All select null as Date, null as DocNo ,null,null, sum(FinalAmt) ,sum(Disc) ,sum(Charges) ,sum(RndOff),sum(SAmt1) ,sum(TAmt1),sum(TCAmt1),sum(TIAmt1),sum(TCeAmt1),sum(SAmt2) ,sum(TAmt2),sum(TCAmt2),sum(TIAmt2),sum(TCeAmt2),sum(SAmt3) ,sum(TAmt3),sum(TCAmt3),sum(TIAmt3),sum(TCeAmt3),sum(SAmt4) ,sum(TAmt4),sum(TCAmt4),sum(TIAmt4),sum(TCeAmt4),sum(AmtTotal) ,sum(TaxToal) from @TVal
+		if((Select Count(*) from @PerTable)=5)
+		select Date,DocNo  ,LedgerName, GSTNO,FinalAmt ,Disc ,Charges ,RndOff,SAmt1 ,TAmt1,TCAmt1,TIAmt1,TCeAmt1,SAmt2 ,TAmt2,TCAmt2,TIAmt2 ,TCeAmt2  ,SAmt3 ,TAmt3 ,TCAmt3,TIAmt3,TCeAmt3,SAmt4 ,TAmt4 ,TCAmt4,TIAmt4,TCeAmt4,SAmt5 ,TAmt5 ,TCAmt5,TIAmt5,TCeAmt5,AmtTotal,TaxToal  from @TVal
+		union All select null as Date, null as DocNo ,null, null,sum(FinalAmt) ,sum(Disc) ,sum(Charges) ,sum(RndOff),sum(SAmt1) ,sum(TAmt1),sum(TCAmt1),sum(TIAmt1),sum(TCeAmt1),sum(SAmt2) ,sum(TAmt2),sum(TCAmt2),sum(TIAmt2),sum(TCeAmt2),sum(SAmt3) ,sum(TAmt3),sum(TCAmt3),sum(TIAmt3),sum(TCeAmt3),sum(SAmt4) ,sum(TAmt4),sum(TCAmt4),sum(TIAmt4),sum(TCeAmt4),sum(SAmt5) ,sum(TAmt5),sum(TCAmt5),sum(TIAmt5),sum(TCeAmt5),sum(AmtTotal) ,sum(TaxToal) from @TVal
+	End
+
+--	if(@Type=2)
+--	Begin
+--		
+--		if((Select Count(*) from @PerTable)=1)
+--		select Date,DocNo ,LedgerName,GSTNO, FinalAmt ,Disc ,Charges ,RndOff,SAmt1 ,TAmt1,TCAmt1,TIAmt1,TCeAmt1,AmtTotal ,TaxToal from @TVal
+--		union All select null as Date, null as DocNo ,null,null, sum(FinalAmt) ,sum(Disc) ,sum(Charges) ,sum(RndOff),sum(SAmt1) ,sum(TAmt1),sum(TCAmt1),sum(TIAmt1),sum(TCeAmt1),sum(AmtTotal) ,sum(TaxToal) from @TVal
+--		if((Select Count(*) from @PerTable)=2)
+--		select Date,DocNo  ,LedgerName,GSTNO, FinalAmt ,Disc ,Charges ,RndOff,SAmt1 ,TAmt1,TCAmt1,TIAmt1,TCeAmt1,SAmt2 ,TAmt2,TCAmt2,TIAmt2 ,TCeAmt2 ,AmtTotal,TaxToal  from @TVal
+--		union All select null as Date, null as DocNo ,null,null, sum(FinalAmt) ,sum(Disc) ,sum(Charges) ,sum(RndOff),sum(SAmt1) ,sum(TAmt1),sum(TCAmt1),sum(TIAmt1),sum(TCeAmt1),sum(SAmt2) ,sum(TAmt2),sum(TCAmt2),sum(TIAmt2),sum(TCeAmt2),sum(AmtTotal) ,sum(TaxToal) from @TVal
+--		if((Select Count(*) from @PerTable)=3)
+--		select Date,DocNo  ,LedgerName,GSTNO, FinalAmt ,Disc ,Charges ,RndOff,SAmt1,TAmt1,TCAmt1,TIAmt1,TCeAmt1,SAmt2 ,TAmt2,TCAmt2,TIAmt2 ,TCeAmt2  ,SAmt3 ,TAmt3 ,TCAmt3,TIAmt3,TCeAmt3,AmtTotal,TaxToal  from @TVal
+--		union All select null as Date, null as DocNo ,null, null,sum(FinalAmt) ,sum(Disc) ,sum(Charges) ,sum(RndOff),sum(SAmt1) ,sum(TAmt1),sum(TCAmt1),sum(TIAmt1),sum(TCeAmt1),sum(SAmt2) ,sum(TAmt2),sum(TCAmt2),sum(TIAmt2),sum(TCeAmt2),sum(SAmt3) ,sum(TAmt3),sum(TCAmt3),sum(TIAmt3),sum(TCeAmt3),sum(AmtTotal) ,sum(TaxToal) from @TVal
+--		if((Select Count(*) from @PerTable)=4)
+--		--select Date,DocNo  , LedgerName,FinalAmt ,Disc ,Charges ,RndOff,SAmt1 ,TAmt1,SAmt2 ,TAmt2 ,SAmt3 ,TAmt3 ,SAmt4 ,TAmt4  ,AmtTotal,TaxToal from @TVal
+--		--union All select null as Date, null as DocNo ,null, sum(FinalAmt) ,sum(Disc) ,sum(Charges) ,sum(RndOff),sum(SAmt1) ,sum(TAmt1),sum(SAmt2) ,sum(TAmt2),sum(SAmt3) ,sum(TAmt3),sum(SAmt4) ,sum(TAmt4),sum(AmtTotal) ,sum(TaxToal) from @TVal
+--		select Date,DocNo  ,LedgerName,GSTNO, FinalAmt ,Disc ,Charges ,RndOff,HSNCode,StateName,SAmt1 ,TAmt1,TCAmt1,TIAmt1,TCeAmt1,SAmt2 ,TAmt2,TCAmt2,TIAmt2 ,TCeAmt2  ,SAmt3 ,TAmt3 ,TCAmt3,TIAmt3,TCeAmt3,SAmt4 ,TAmt4 ,TCAmt4,TIAmt4,TCeAmt4,AmtTotal,TaxToal  from @TVal
+--		union All select null as Date, null as DocNo ,null,null, sum(FinalAmt) ,sum(Disc) ,sum(Charges) ,sum(RndOff),null,null,sum(SAmt1) ,sum(TAmt1),sum(TCAmt1),sum(TIAmt1),sum(TCeAmt1),sum(SAmt2) ,sum(TAmt2),sum(TCAmt2),sum(TIAmt2),sum(TCeAmt2),sum(SAmt3) ,sum(TAmt3),sum(TCAmt3),sum(TIAmt3),sum(TCeAmt3),sum(SAmt4) ,sum(TAmt4),sum(TCAmt4),sum(TIAmt4),sum(TCeAmt4),sum(AmtTotal) ,sum(TaxToal) from @TVal
+--		if((Select Count(*) from @PerTable)=5)
+--		select Date,DocNo  ,LedgerName, GSTNO,FinalAmt ,Disc ,Charges ,RndOff,HSnCode,StateName,SAmt1 ,TAmt1,TCAmt1,TIAmt1,TCeAmt1,SAmt2 ,TAmt2,TCAmt2,TIAmt2 ,TCeAmt2  ,SAmt3 ,TAmt3 ,TCAmt3,TIAmt3,TCeAmt3,SAmt4 ,TAmt4 ,TCAmt4,TIAmt4,TCeAmt4,SAmt5 ,TAmt5 ,TCAmt5,TIAmt5,TCeAmt5,AmtTotal,TaxToal  from @TVal
+--		union All select null as Date, null as DocNo ,null, null,sum(FinalAmt) ,sum(Disc) ,sum(Charges) ,sum(RndOff),null,null,sum(SAmt1) ,sum(TAmt1),sum(TCAmt1),sum(TIAmt1),sum(TCeAmt1),sum(SAmt2) ,sum(TAmt2),sum(TCAmt2),sum(TIAmt2),sum(TCeAmt2),sum(SAmt3) ,sum(TAmt3),sum(TCAmt3),sum(TIAmt3),sum(TCeAmt3),sum(SAmt4) ,sum(TAmt4),sum(TCAmt4),sum(TIAmt4),sum(TCeAmt4),sum(SAmt5) ,sum(TAmt5),sum(TCAmt5),sum(TIAmt5),sum(TCeAmt5),sum(AmtTotal) ,sum(TaxToal) from @TVal
+--	End
+--	else
+--	Begin
+--		if((Select Count(*) from @PerTable)=1)
+--		select Date,DocNo , FinalAmt ,Disc ,Charges ,RndOff,SAmt1 ,TAmt1,AmtTotal ,TaxToal from @TVal
+--		union All select null as Date, null as DocNo , sum(FinalAmt) ,sum(Disc) ,sum(Charges) ,sum(RndOff),sum(SAmt1) ,sum(TAmt1),sum(AmtTotal) ,sum(TaxToal) from @TVal
+--		if((Select Count(*) from @PerTable)=2)
+--		select Date,DocNo  , FinalAmt ,Disc ,Charges ,RndOff,SAmt1 ,TAmt1,SAmt2 ,TAmt2 ,AmtTotal,TaxToal  from @TVal
+--		union All select null as Date, null as DocNo , sum(FinalAmt) ,sum(Disc) ,sum(Charges) ,sum(RndOff),sum(SAmt1) ,sum(TAmt1),sum(SAmt2) ,sum(TAmt2),sum(AmtTotal) ,sum(TaxToal) from @TVal
+--		if((Select Count(*) from @PerTable)=3)
+--		select Date,DocNo  , FinalAmt ,Disc ,Charges ,RndOff,SAmt1 ,TAmt1,SAmt2 ,TAmt2 ,SAmt3 ,TAmt3 ,AmtTotal ,TaxToal from @TVal
+--		union All select null as Date, null as DocNo , sum(FinalAmt) ,sum(Disc) ,sum(Charges) ,sum(RndOff),sum(SAmt1) ,sum(TAmt1),sum(SAmt2) ,sum(TAmt2),sum(SAmt3) ,sum(TAmt3),sum(AmtTotal) ,sum(TaxToal) from @TVal
+--		if((Select Count(*) from @PerTable)=4)
+--		select Date,DocNo  , FinalAmt ,Disc ,Charges ,RndOff,SAmt1 ,TAmt1,SAmt2 ,TAmt2 ,SAmt3 ,TAmt3 ,SAmt4 ,TAmt4  ,AmtTotal,TaxToal from @TVal
+--		union All select null as Date, null as DocNo , sum(FinalAmt) ,sum(Disc) ,sum(Charges) ,sum(RndOff),sum(SAmt1) ,sum(TAmt1),sum(SAmt2) ,sum(TAmt2),sum(SAmt3) ,sum(TAmt3),sum(SAmt4) ,sum(TAmt4),sum(AmtTotal) ,sum(TaxToal) from @TVal
+--		if((Select Count(*) from @PerTable)=5)
+--		select Date,DocNo  , FinalAmt ,Disc ,Charges ,RndOff,SAmt1 ,TAmt1,SAmt2 ,TAmt2 ,SAmt3 ,TAmt3 ,SAmt4 ,TAmt4 ,SAmt5 ,TAmt5 ,AmtTotal,TaxToal  from @TVal
+--		union All select null as Date, null as DocNo , sum(FinalAmt) ,sum(Disc) ,sum(Charges) ,sum(RndOff),sum(SAmt1) ,sum(TAmt1),sum(SAmt2) ,sum(TAmt2),sum(SAmt3) ,sum(TAmt3),sum(SAmt4) ,sum(TAmt4),sum(SAmt5) ,sum(TAmt5),sum(AmtTotal) ,sum(TaxToal) from @TVal
+--	End
+
+
+End
+
+
+	
+END
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

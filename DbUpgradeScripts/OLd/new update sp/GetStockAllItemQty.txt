@@ -1,0 +1,110 @@
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[GetStockAllItemQty]
+@CompNo		           numeric(18),
+@FromDate	           datetime,
+@ToDate		           datetime,
+@ItStr		            varchar(max),
+@Itype                numeric(18)
+
+
+
+AS
+Declare @ItemNo		numeric(18)
+Declare @TStock TABLE (ItemNo int,ItemName varchar(max),OpQty numeric(18,2),InwardQty numeric(18,2),OutwardQty numeric(18,2),Quantity numeric(18,2))
+Declare @ItemTable TABLE(ItemNo numeric(18))
+Declare @ItemName varchar(max),@OpQty numeric(18,2),@CrQty numeric(18,2),@ClosingQty numeric(18,2),@DrQty numeric(18,2),@StrQry varchar(max),@ItNo numeric(18),@StrItem varchar(max),@StrVchType varchar(max)
+set @OpQty=0  set @DrQty=0  set @CrQty=0 set @StrQry='' 
+set @StrItem=''
+
+
+if(@ItStr<>'')
+	begin
+		set @StrItem='(TStock.ItemNo in ('+@ItStr+')) AND ' 
+		--insert into @ItemTable  Exec (@StrQry) 
+    end
+else
+    begin
+		set @StrItem=' '
+    end
+
+if(@Itype=0)
+begin 
+set @StrVchType='and TVoucherEntry.vouchertypecode in(15,12,13,9,8)'
+end
+else
+begin 
+set @StrVchType='and TVoucherEntry.vouchertypecode in(115,112,113,109,108)'
+end
+
+set @StrQry='Select Tbl1.ItemNo,(SELECT     MItemGroup.ItemGroupName + '' '' + CASE WHEN (ItemShortName <> '''') THEN ItemShortName ELSE ItemName END AS Expr1
+                            FROM          MItemMaster AS MItemMaster_1 INNER JOIN
+                                                   MItemGroup ON MItemMaster_1.GroupNo = MItemGroup.ItemGroupNo
+                            WHERE      (MItemMaster_1.ItemNo = Tbl1.ItemNo)) As ItemName, Sum(OpQty) As OpQty, abs(Sum(InQty)) As InwardQty, abs(Sum(OutQty)) As OutwardQty, 
+Sum(OpQty + abs(InQty) - abs(OutQty)) As Quantity,MItemMaster.Barcode From
+(
+SELECT  TStock.ItemNo,
+         sum(case when (TStock.TrnCode = 1) then isnull(TStock.BilledQuantity,0) 
+                 else isnull(TStock.BilledQuantity,0)*-1 end) as OpQty,
+        0.00 as InQty, 0.00 as OutQty
+FROM    TVoucherEntry INNER JOIN
+        TStock ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+WHERE   ' + @StrItem + ' (TVoucherEntry.VoucherDate < '''+cast(@FromDate as varchar)+''')  and TVoucherEntry.IsCancel=''false'' ' + @StrVchType + '
+Group by TStock.itemno
+UNION ALL
+SELECT  TStock.ItemNo,
+         0.00 as OpQty,
+         sum(case when (TStock.TrnCode = 1) then isnull(TStock.BilledQuantity,0) 
+                 else 0.00 end ) as InQty,
+         sum(case when (TStock.TrnCode = 2) then isnull(TStock.BilledQuantity,0)*-1 
+                 else 0.00 end) as OutQty
+FROM    TVoucherEntry INNER JOIN
+        TStock ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+WHERE    ' + @StrItem + ' (TVoucherEntry.VoucherDate >= '''+cast(@FromDate as varchar)+''') AND 
+        (TVoucherEntry.VoucherDate <= '''+cast(@ToDate as varchar)+''')  and TVoucherEntry.IsCancel=''false'' ' + @StrVchType + '
+Group by TStock.itemno
+) As Tbl1 
+INNER JOIN  MItemMaster ON MItemMaster.ItemNo = Tbl1.ItemNo
+Group BY Tbl1.ItemNo, MItemMaster.ItemName ,MItemMaster.Barcode
+order by ItemName '
+
+Exec(@StrQry)
+
+--Select Tbl1.ItemNo,(SELECT     MItemGroup.ItemGroupName + ' ' + CASE WHEN (ItemShortName <> '') THEN ItemShortName ELSE ItemName END AS Expr1
+--                            FROM          MItemMaster AS MItemMaster_1 INNER JOIN
+--                                                   MItemGroup ON MItemMaster_1.GroupNo = MItemGroup.ItemGroupNo
+--                            WHERE      (MItemMaster_1.ItemNo = Tbl1.ItemNo)) As ItemName, Sum(OpQty) As OpQty, abs(Sum(InQty)) As InwardQty, abs(Sum(OutQty)) As OutwardQty, 
+--Sum(OpQty + abs(InQty) - abs(OutQty)) As Quantity,MItemMaster.Barcode From
+--(
+--SELECT  TStock.ItemNo,
+--         sum(case when (TStock.TrnCode = 1) then isnull(TStock.BilledQuantity,0) 
+--                 else isnull(TStock.BilledQuantity,0)*-1 end) as OpQty,
+--        0.00 as InQty, 0.00 as OutQty
+--FROM    TVoucherEntry INNER JOIN
+--        TStock ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+--WHERE  TStock.itype=1 and  (TStock.ItemNo in (46637,46639,46640,46592,46587,46609,46608,46590,46607)) AND  (TVoucherEntry.VoucherDate < 'Jan  1 2018 12:00AM')  and TVoucherEntry.IsCancel='false'
+--Group by TStock.itemno
+--UNION ALL
+--SELECT  TStock.ItemNo,
+--         0.00 as OpQty,
+--         sum(case when (TStock.TrnCode = 1) then isnull(TStock.BilledQuantity,0) 
+--                 else 0.00 end ) as InQty,
+--         sum(case when (TStock.TrnCode = 2) then isnull(TStock.BilledQuantity,0)*-1 
+--                 else 0.00 end) as OutQty
+--FROM    TVoucherEntry INNER JOIN
+--        TStock ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+--WHERE  TStock.itype=1 and  (TStock.ItemNo in (46637,46639,46640,46592,46587,46609,46608,46590,46607)) AND  (TVoucherEntry.VoucherDate >= 'Jan  1 2018 12:00AM') AND 
+--        (TVoucherEntry.VoucherDate <= 'Jan 11 2019 12:00AM')  and TVoucherEntry.IsCancel='false'
+--Group by TStock.itemno
+--) As Tbl1 
+--INNER JOIN  MItemMaster ON MItemMaster.ItemNo = Tbl1.ItemNo
+--Group BY Tbl1.ItemNo, MItemMaster.ItemName ,MItemMaster.Barcode
+--order by ItemName 
+
+	RETURN
+
+
+
+
+

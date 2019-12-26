@@ -1,0 +1,75 @@
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[GetGSTTaxDetailsHSNCodeWise] 
+
+	@FromDate datetime,
+	@ToDate datetime,
+	@VchType numeric(18)
+	
+AS
+BEGIN
+	Declare @PerTable Table(TempPer numeric(18,2),ColNo numeric(18))
+declare @StrQry varchar(max)
+--	Declare @ColName numeric(18,2),@Cnt numeric(18),@DocNo numeric(18),@Date datetime,@Amt numeric(18,2),@Per numeric(18,2),
+--			@Pk numeric(18),@TotTax numeric(18,2), @TotAmt numeric(18,2),@TotAmt2 numeric(18,2),@TaxToal numeric(18,2),@AmtTotal numeric(18,2),
+--			@FinalAmount numeric(18,2),@StrQry varchar(max),@TempPer numeric(18,2),@TaxAmt numeric(18,2),@TaxAmt2 numeric(18,2),@TempDate datetime,@GSTNO varchar(50),@HSNCode varchar(50),@UomName varchar(50),@ItemNo numeric(18)
+--	Declare @Month varchar(20),@MNo int ,@TDate datetime ,@Yr int,@FrDate datetime,@TempPk numeric(18),@TempColNo numeric(18),
+--			@TaxAmount numeric(18,2),@TaxAmount2 numeric(18,2),@TempDocNo numeric(18),@Disc numeric(18,2),@Charges numeric(18,2),@RndOff numeric(18,2),@LedgerName varchar(max)
+--	Declare @TVal Table(DocNo numeric(18),Date datetime,LedgerName varchar(max),GSTNO varchar(50),HSNCode varchar(50),UomName varchar(50),ItemNo numeric(18), FinalAmt numeric(18,2),Disc numeric(18,2),Charges numeric(18,2),RndOff numeric(18,2),SAmt1 numeric(18,2),TAmt1 numeric(18,2),TCAmt1 numeric(18,2),
+--			SAmt2 numeric(18,2),TAmt2 numeric(18,2),TCAmt2 numeric(18,2),SAmt3 numeric(18,2),TAmt3 numeric(18,2),TCAmt3 numeric(18,2),SAmt4 numeric(18,2),
+--			TAmt4 numeric(18,2),TCAmt4 numeric(18,2),SAmt5 numeric(18,2),TAmt5 numeric(18,2),TCAmt5 numeric(18,2),TaxToal numeric(18,2),AmtTotal numeric(18,2))
+--	Declare @TDisc Table(LedgNo numeric(18))
+--	Declare @TChrg Table(LedgNo numeric(18))
+--	set @Cnt=0  set @TempPk=0 set @TaxToal =0 set @AmtTotal =0
+--    set @Amt=0 set @Per=0 set @TotTax=0 set @TotAmt=0 set @Disc =0 set @Charges =0 set @RndOff =0
+--	 set @StrQry='' set @FrDate=@FromDate set @TempColNo=0  set @TempDocNo=0 set @TempDate='01-01-1900'
+--
+--set @StrQry='Select distinct TStock.TaxPercentage,0 FROM TVoucherEntry INNER JOIN
+--								  TStock ON TVoucherEntry.PkVoucherNo = TStock.FKVoucherNo
+--								  WHERE TaxTypeNo= '+Cast(@TaxTypeNo as varchar)+' AND TVoucherEntry.VoucherTypeCode='+cast(@VchType as varchar)+'
+--			and TVoucherEntry.VoucherDate>='''+cast(@FromDate as varchar)+''' and TVoucherEntry.VoucherDate<='''+cast(@ToDate as varchar)+''' order by TStock.TaxPercentage'
+----(TStock.TaxPercentage <> 0) and
+--insert into @PerTable Exec(@StrQry) --select * from @PerTable
+--insert into @TDisc Exec('Select LedgerNo From MLedger Where LedgerNo in ('+ @DiscLedg +')')
+--insert into @TChrg Exec('Select LedgerNo From MLedger Where LedgerNo in ('+ @ChargesLedg +')')
+--
+--Declare CurCol Cursor for Select TempPer from @PerTable
+--		open CurCol
+--		Fetch next from CurCol into @TempPer
+--		while (@@Fetch_Status=0)
+--		Begin
+--			set @Cnt=@Cnt+1	
+--			update 	@PerTable set ColNo=@Cnt where 	TempPer=@TempPer
+--			Fetch next from CurCol into @TempPer
+--		End
+--		Close CurCol Deallocate CurCol
+--
+--select * from @PerTable
+--set @Cnt=0 ,VoucherDate
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ 					
+ set @StrQry='SELECT   HSNCode,ItemGroupName + ''  ''+MItemMaster.ItemName As Itemname,UOMShortCode +'' - ''+ UOMShortCode as Uomname,
+sum(TStock.Quantity) as Quantity, sum(tstock.Amount) as Amount,sum((tstock.Netamount)-(TStock.SGSTAmount+TStock.IGSTAmount+TStock.CessAmount+TStock.CGSTAmount)) as NetAmount,
+sum(TStock.IGSTAmount) as IGSTAmount ,sum(TStock.CGSTAmount) as CGSTAmount ,sum(TStock.SGSTAmount) as SGSTAmount,sum(TStock.CessAmount) as CessAmount 
+FROM TVoucherEntry AS TVoucherEntry_1 INNER JOIN
+TStock ON TVoucherEntry_1.PkVoucherNo = TStock.FKVoucherNo  
+inner join MItemMaster on TStock.itemno=MItemMaster.itemno
+INNER JOIN MItemGroup on MItemGroup.ItemGroupNo=MItemMaster.groupno
+inner join muom on tstock.FkUomNo=muom.uomno
+WHERE TVoucherEntry_1.VoucherTypeCode='+cast(@VchType as varchar)+' and  VoucherDate>='''+cast(@FromDate as varchar)+''' and VoucherDate<='''+cast(@ToDate as varchar)+'''
+and TVoucherEntry_1.iscancel= 0  group by HSNCode,ItemGroupName,ItemName,UOMShortCode,UOMShortCode
+
+order by HSNCode'
+
+ Exec(@StrQry) 
+END
+
+
+
+
+
+
+
+
+

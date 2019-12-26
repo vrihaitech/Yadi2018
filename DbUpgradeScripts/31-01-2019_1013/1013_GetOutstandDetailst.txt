@@ -1,0 +1,332 @@
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[GetOutstandDetailst]
+@VchType   numeric(18),
+@CompanyNo  numeric(18),
+@ToDate datetime,
+@TempLedgNo varchar(max)
+
+AS
+
+if(@VchType=15)
+  Begin
+	SELECT MLedger.LedgerNo, Ledgername +' -'+ Cityname as Ledgername ,  SUM(TVoucherDetails.Debit) AS debit, SUM(TVoucherDetails.Credit) AS credit, SUM(TVoucherDetails.Debit) - SUM(TVoucherDetails.Credit) AS Balance,mobileno1
+FROM         TVoucherDetails INNER JOIN
+                      MLedger ON TVoucherDetails.LedgerNo = MLedger.LedgerNo LEFT JOIN
+                      MLedgerDetails ON MLedger.LedgerNo = MLedgerDetails.LedgerNo LEFT  JOIN
+                      MCity ON MLedgerDetails.CityNo = MCity.CityNo
+
+inner join TVoucherEntry on TVoucherEntry.pkvoucherno=TVoucherDetails.fkvoucherno
+INNER JOIN fn_Split (@TempLedgNo, ',') AS Party_BILL on MLedger.LedgerNo= CAST(Party_BILL.value AS numeric)
+WHERE    -- TVoucherDetails.LedgerNo in('+@TempLedgNo+')
+TVoucherEntry.VoucherDate<=''+cast(@ToDate as varchar)+''  and TVoucherEntry.IsCancel='false' and vouchertypecode in (15,11,30,36)
+group by MLedger.LedgerNo, Ledgername +' -'+ Cityname,mobileno1
+order by Ledgername +' -'+ Cityname
+  End
+else if(@VchType=115)
+  Begin
+	SELECT MLedger.LedgerNo, Ledgername +' -'+ Cityname as Ledgername ,  SUM(TVoucherDetails.Debit) AS debit, SUM(TVoucherDetails.Credit) AS credit, SUM(TVoucherDetails.Debit) - SUM(TVoucherDetails.Credit) AS Balance,mobileno1
+FROM         TVoucherDetails INNER JOIN
+                      MLedger ON TVoucherDetails.LedgerNo = MLedger.LedgerNo LEFT JOIN
+                      MLedgerDetails ON MLedger.LedgerNo = MLedgerDetails.LedgerNo LEFT  JOIN
+                      MCity ON MLedgerDetails.CityNo = MCity.CityNo
+
+inner join TVoucherEntry on TVoucherEntry.pkvoucherno=TVoucherDetails.fkvoucherno
+INNER JOIN fn_Split (@TempLedgNo, ',') AS Party_BILL on MLedger.LedgerNo= CAST(Party_BILL.value AS numeric)
+WHERE    -- TVoucherDetails.LedgerNo in('+@TempLedgNo+')
+TVoucherEntry.VoucherDate<=''+cast(@ToDate as varchar)+''  and TVoucherEntry.IsCancel='false'  and vouchertypecode in (115,111,130,136)
+group by MLedger.LedgerNo, Ledgername +' -'+ Cityname,mobileno1
+order by Ledgername +' -'+ Cityname
+  End
+else if(@VchType=9)
+Begin
+	SELECT MLedger.LedgerNo, Ledgername +' -'+ Cityname as Ledgername  ,  SUM(TVoucherDetails.Credit) AS debit, SUM(TVoucherDetails.Debit) AS credit, SUM(TVoucherDetails.credit) - SUM(TVoucherDetails.Debit) AS Balance,mobileno1
+FROM         TVoucherDetails INNER JOIN
+                      MLedger ON TVoucherDetails.LedgerNo = MLedger.LedgerNo LEFT JOIN
+                      MLedgerDetails ON MLedger.LedgerNo = MLedgerDetails.LedgerNo LEFT  JOIN
+                      MCity ON MLedgerDetails.CityNo = MCity.CityNo
+
+inner join TVoucherEntry on TVoucherEntry.pkvoucherno=TVoucherDetails.fkvoucherno
+INNER JOIN fn_Split (@TempLedgNo, ',') AS Party_BILL on MLedger.LedgerNo= CAST(Party_BILL.value AS numeric)
+WHERE    -- TVoucherDetails.LedgerNo in(+@TempLedgNo) and 
+TVoucherEntry.VoucherDate<=''+cast(@ToDate as varchar)+''  and TVoucherEntry.IsCancel='false' and vouchertypecode in (9,7,31,36)
+group by MLedger.LedgerNo, Ledgername +' -'+ Cityname,mobileno1
+order by Ledgername +' -'+ Cityname
+end
+else if(@VchType=109)
+Begin
+	SELECT MLedger.LedgerNo, Ledgername +' -'+ Cityname as Ledgername  ,  SUM(TVoucherDetails.Credit) AS debit, SUM(TVoucherDetails.Debit) AS credit, SUM(TVoucherDetails.credit) - SUM(TVoucherDetails.Debit) AS Balance,mobileno1
+FROM         TVoucherDetails INNER JOIN
+                      MLedger ON TVoucherDetails.LedgerNo = MLedger.LedgerNo LEFT JOIN
+                      MLedgerDetails ON MLedger.LedgerNo = MLedgerDetails.LedgerNo LEFT  JOIN
+                      MCity ON MLedgerDetails.CityNo = MCity.CityNo
+
+inner join TVoucherEntry on TVoucherEntry.pkvoucherno=TVoucherDetails.fkvoucherno
+INNER JOIN fn_Split (@TempLedgNo, ',') AS Party_BILL on MLedger.LedgerNo= CAST(Party_BILL.value AS numeric)
+WHERE    -- TVoucherDetails.LedgerNo in(+@TempLedgNo) and 
+TVoucherEntry.VoucherDate<=''+cast(@ToDate as varchar)+''  and TVoucherEntry.IsCancel='false' and vouchertypecode in (109,107,131,136)
+group by MLedger.LedgerNo, Ledgername +' -'+ Cityname,mobileno1
+order by Ledgername +' -'+ Cityname
+end
+
+
+
+--Declare @Summary Table(VoucherUserNo numeric(18),VoucherDate datetime,LedgerName varchar(500),Debit numeric(18,2),TotRec numeric(18,2),NetBal numeric(18,2),TempBillNo numeric(18),RefType varchar(100))
+--Declare @TempTable Table(RefNo numeric(18),VchDate datetime,VoucherUserNo numeric(18),Amount numeric(18,2),LedgerName varchar(200),LedgerNo numeric(18),VType numeric(18))
+--					
+--					   
+--
+--Declare @SrNo numeric(18),@Amount numeric(18,2),@LedgerName varchar(500),
+--		@RefNo numeric(18),@SNo numeric(18),@BillNo numeric(18),
+--		@TotalAmount numeric(18,2),@TypeNo numeric(18),@VchDate datetime,
+--		@ReceivedAmt numeric(18,2),@BalanceAmt numeric(18,2),@PayAmt numeric(18,2),@PKVoucherNo numeric(18),@Disc numeric(18,2),@TotBalAmt numeric(18,2),@DiscAmt numeric(18,2),@NewBalAmt numeric(18,2),
+--		@CompanyName varchar(max),@VoucherNo numeric(18),@LedgNo numeric(18),@StrQuery varchar(max),@LedgerNo numeric(18),@TempAmt numeric(18,2),@TempDate datetime,@TempBillNo numeric(18),@vch numeric(18),@vch1 numeric(18),
+--		@AdvAmt numeric(18,2),@AdvAdjAmt numeric(18,2),@TempLedgName varchar(500),@RefType varchar(100),@OpBal numeric(18,2),@AdjOpBal numeric(18,2),@OpAdjBal numeric(18,2),@TotOpBal numeric(18,2) , @TempLedgerName varchar(500),
+--		@TotRecAmt numeric(18,2),@GrTotAmt numeric(18,2),@GrTotRec numeric(18,2),@GrTotNetBal numeric(18,2) ,@TotAdv numeric(18,2),
+--		@TempOpBal numeric(18,2),@TempTotAdv numeric(18,2),@TLedgNo numeric(18),
+--		@TotAmount numeric(18,2),@TempSrt varchar(100),@VchTypeTemp varchar(max),@VType numeric(18)
+--
+--set @StrQuery='' set @TempLedgName=''set @TempLedgerName='' set @TotRecAmt=0 
+--set @GrTotAmt=0 set @GrTotRec=0 set @GrTotNetBal=0  set @TotAdv=0 set @TempTotAdv=0 set @TempOpBal=0
+--set @TLedgNo=0 set @TotAmount=0 set @TempSrt=''
+--
+--set @SrNo=0
+--set @TotalAmount=0
+--set @TotBalAmt=0
+--set @DiscAmt=0
+--
+--	Select @LedgNo=LedgerNo FRom MPayTypeLedger Where CompanyNo=@CompanyNo AND PayTypeNo=2	
+--if(@VchType=15)
+--  Begin
+--	set @vch=30 set @vch1=12 
+--  End
+--else
+--Begin
+--	set @vch=31 set @vch1=13 
+--End
+--
+--set @StrQuery='SELECT TVoucherRefDetails.RefNo, TVoucherEntry.VoucherDate, TVoucherEntry.VoucherUserNo, TVoucherRefDetails.Amount,MLedger.LedgerName,MLedger.LedgerNo,TVoucherEntry.VoucherTypeCode	
+--								   FROM  TVoucherEntry INNER JOIN
+--										 TVoucherDetails ON TVoucherDetails.FkVoucherNo = TVoucherEntry.PkVoucherNo INNER JOIN
+--										 TVoucherRefDetails ON TVoucherDetails.PkVoucherTrnNo = TVoucherRefDetails.FkVoucherTrnNo INNER JOIN
+--										 MLedger ON TVoucherDetails.LedgerNo = MLedger.LedgerNo										  
+--								  WHERE  (TVoucherEntry.VoucherTypeCode in ('+cast(@VchType as varchar)+')) AND (TVoucherRefDetails.TypeOfRef = 3) AND 
+--										 (TVoucherEntry.CompanyNo = '+cast(@CompanyNo as varchar)+') and TVoucherEntry.VoucherDate<='''+cast(@ToDate as varchar)+'''  and TVoucherEntry.IsCancel=''false''
+--										and TVoucherDetails.LedgerNo in('+@TempLedgNo+')
+--								  ORDER BY TVoucherDetails.LedgerNo,TVoucherEntry.VoucherDate,TVoucherEntry.VoucherTypeCode	'	
+--
+--
+--insert into @TempTable exec(@StrQuery)
+--
+--Declare CurTemp Cursor for Select RefNo ,VchDate ,VoucherUserNo ,Amount ,LedgerName,LedgerNo,VType  from @TempTable
+--
+--		open CurTemp
+--
+--			Fetch next from CurTemp into  @RefNo ,@VchDate,@BillNo,@Amount,@LedgerName,@LedgerNo,@VType
+--														
+--			--set @TempLedgName=@LedgerName
+--				While(@@Fetch_Status=0)
+--				 Begin
+--
+--					--for Advance
+--					Select @AdvAmt=isNull(Sum(Amount),0) from TVoucherRefDetails where TypeOfRef=1 and LedgerNo=@LedgerNo
+--					select @AdvAdjAmt=isNull(Sum(Amount),0) from TVoucherRefDetails where TypeOfRef=6 and LedgerNo=@LedgerNo
+--					select @TotBalAmt=IsNull(sum(TVoucherRefDetails.Amount),0) from TVoucherRefDetails where RefNo=@RefNo and TypeOfRef in(2,5) AND RefNo<>0
+--					if(@AdvAdjAmt<>0 and @AdvAmt<>@AdvAdjAmt)
+--					set @TotAdv=@AdvAmt-@AdvAdjAmt
+--					else 
+--					set @TotAdv=@AdvAmt									
+--					set @TotalAmount=@Amount-@TotBalAmt					
+--					if(@TotalAmount>0)
+--					Begin
+--						if(@TempLedgerName<>@LedgerName)
+--						Begin						
+--							if(@TempLedgerName<>'')
+--							begin
+--								if(@TotAmount-@GrTotRec<>0)
+--								Begin									
+--									if(@VchType=15)
+--									Begin									
+--										if(@TotAmount-@GrTotRec>0)
+--											set @TempSrt='To Receive'
+--										else if(@TotAmount-@GrTotRec<0)
+--											set @TempSrt='To Pay'
+--										else set @TempSrt=''
+--											insert into @Summary values (0,'01-01-1900',@TempLedgerName,@TotAmount,@GrTotRec,@TotAmount-@GrTotRec,0,'')									
+--									end									
+--									else if(@VchType=9)									
+--										insert into @Summary values (0,'01-01-1900',@TempLedgerName,@TotAmount,@GrTotRec,@TotAmount-@GrTotRec,0,'')
+--								End	
+--								set @TotAmount=0
+--								set @GrTotAmt=0	
+--								set @GrTotRec=0
+--							end
+--							--for OpeningBalance
+--							    Select @OpBal=OpAmt from GetOpeningLedgerBalanceOnly(@LedgerNo, @CompanyNo)
+--								Select @AdjOpBal=isNull(Sum(case when (signcode=1) then isNull(Amount,0) else isNull(Amount,0)*-1 end),0) from TVoucherRefDetails where LedgerNo=@LedgerNo and TypeOfRef=5 AND REFNO <> 0
+--								Select @OpAdjBal=isNull(Sum(case when (signcode=2) then isNull(Amount,0) else isNull(Amount,0)*-1 end),0) from TVoucherRefDetails where LedgerNo=@LedgerNo and TypeOfRef=5 AND REFNO = 0
+--								set @TotOpBal=@OpBal+@AdjOpBal+@OpAdjBal
+--								
+--								if(@OpBal<>@TotOpBal)
+--									set @TempOpBal=	@OpBal-(@TotOpBal)
+--								else 
+--									set @TempOpBal=@OpBal
+--							--insert into @Summary values (0,'01-01-1900',@LedgerName,0,0,0,0,'')										
+--						end
+--						
+--							set @GrTotAmt=@GrTotAmt+@Amount
+--						
+--						
+--						set @TotRecAmt=0
+--					
+--						if(@TempLedgerName<>@LedgerName)
+--						begin
+--							--if(@AdvAmt-@AdvAdjAmt>0)
+--							if(@AdvAmt<>0)
+--							--insert into @Summary values (0,'01-01-1900','Advance',0,@AdvAmt,0,1,'Advance')
+--							set @GrTotRec=@GrTotRec+@AdvAmt
+--							if(@AdvAdjAmt<>0)
+--							begin
+--							--insert into @Summary values (0,'01-01-1900','AdjAdv',0,@AdvAdjAmt,0,1,'Advance')
+--							set @TotAmount=@TotAmount+@AdvAdjAmt
+--							end
+--
+--								if(@OpBal>0)
+--									Begin 
+--									--insert into @Summary values (0,'01-01-1900','OpBal',0,@OpBal,0,-2,'OpBal')
+--									set @GrTotRec=@GrTotRec+abs(@OpBal)
+--									End
+--								else if(@OpBal<0)
+--									Begin
+--									--insert into @Summary values (0,'01-01-1900','OpBal',@OpBal,0,0,-2,'OpBal')
+--									set @TotAmount=@TotAmount+abs(@OpBal)
+--									end
+--								if(@OpBal-@TotOpBal>0)
+--									begin
+--									--insert into @Summary values (0,'01-01-1900','AdjOpBal',@OpBal-@TotOpBal,0,0,-2,'OpBal')
+--									set @TotAmount=@TotAmount+abs(@OpBal-@TotOpBal)
+--									end
+--								else if(@OpBal-@TotOpBal<0)
+--									begin
+--									--insert into @Summary values (0,'01-01-1900','AdjOpBal',0,@OpBal-@TotOpBal,0,-2,'OpBal')
+--									set @GrTotRec=@GrTotRec+abs(@OpBal-@TotOpBal)
+--									end
+--			
+----								if(@OpBal-(@OpBal-@TotOpBal)>0)
+----									set @GrTotRec=@GrTotRec+abs(@OpBal-(@OpBal-@TotOpBal))
+----								else if(@OpBal-(@OpBal-@TotOpBal)<0)
+----									set @TotAmount=@TotAmount+abs(@OpBal-(@OpBal-@TotOpBal))
+--								--select @TotOpBal,@TotOpBal
+----								if(@TotOpBal<0 and @TotOpBal<>0)
+----								Begin
+----									insert into @Summary values (0,'01-01-1900','OpBal',abs(@OpBal),0,0,-2,'OpBal')
+----									if(@OpBal<>@TotOpBal and @OpBal-@TotOpBal<>0)
+----									insert into @Summary values (0,'01-01-1900','AdjOpBal',@OpBal-@TotOpBal,0,0,-2,'OpBal')
+----									--else									
+----									set @TotAmount=@TotAmount+abs(@OpBal-@TotOpBal)--abs(@OpBal)
+----									
+----								end								
+----								else if(@TotOpBal<>0)
+----								Begin
+----									insert into @Summary values (0,'01-01-1900','OpBal',0,abs(@OpBal),0,-2,'OpBal')
+----									if(@OpBal<>@TotOpBal and @OpBal-@TotOpBal<>0)
+----									insert into @Summary values (0,'01-01-1900','AdjOpBal',0,@OpBal-@TotOpBal,0,-2,'OpBal')
+----									else											
+----										set @GrTotRec=@GrTotRec+@OpBal
+----								end
+--					end
+----					if(@VType<>@vch1)
+----					--insert into @Summary values (@BillNo,@VchDate,'',@Amount,@Amount-@TotalAmount,@TotalAmount,0,'')
+----					else
+--					--insert into @Summary values (@BillNo,@VchDate,'  *',@Amount,@Amount-@TotalAmount,@TotalAmount,0,'')
+--					if(@VType<>@vch1)
+--					set @GrTotRec=@GrTotRec+(@Amount-@TotalAmount)
+--					else
+--					set @GrTotRec=@GrTotRec+(@TotalAmount)
+--					set @TempLedgerName=@LedgerName
+--					set @TLedgNo=@LedgerNo
+--					set @TotRecAmt=0
+--					Declare CurDetails Cursor For SELECT TVoucherEntry.VoucherDate, TVoucherRefDetails.Amount, TVoucherEntry.VoucherUserNo, MTypeOfRef.TypeOfRef
+--												  FROM TVoucherEntry INNER JOIN TVoucherDetails ON TVoucherDetails.FkVoucherNo = TVoucherEntry.PkVoucherNo INNER JOIN
+--												  TVoucherRefDetails ON TVoucherDetails.PkVoucherTrnNo = TVoucherRefDetails.FkVoucherTrnNo LEFT OUTER JOIN
+--												  TVoucherChqCreditDetails ON TVoucherEntry.PkVoucherNo = TVoucherChqCreditDetails.FKVoucherNo INNER JOIN
+--												  MPayType ON TVoucherEntry.PayTypeNo = MPayType.PKPayTypeNo INNER JOIN MTypeOfRef ON TVoucherRefDetails.TypeOfRef = MTypeOfRef.RefTypeCode
+--												  WHERE     (TVoucherDetails.LedgerNo = @LedgerNo) AND (TVoucherEntry.VoucherTypeCode in(@vch,@vch1)) AND (TVoucherRefDetails.RefNo = @RefNo) AND (TVoucherEntry.CompanyNo = @CompanyNo)
+--											      ORDER BY TVoucherEntry.VoucherDate
+--					
+--					open CurDetails
+--				
+--						fetch next from CurDetails into @TempDate,@TempAmt,@TempBillNo,@RefType
+--						While(@@Fetch_Status=0)
+--						Begin
+----							if(@VType<>@vch1)
+----							insert into @Summary values (@TempBillNo,@TempDate,'',0,@TempAmt,0,@TempBillNo,@RefType)
+--							set @TotRecAmt=@TotRecAmt+@TempAmt
+--							
+--						fetch next from CurDetails into @TempDate,@TempAmt,@TempBillNo,@RefType
+--						End
+--					Close CurDetails Deallocate CurDetails
+--					End
+--					if(@LedgerName<>'')
+--					begin
+--					if(@TotalAmount<>0)
+--					Begin
+----					if(@VType<>@vch1)
+----					insert into @Summary values (0,'01-01-1900','Total',@Amount,@TotRecAmt,@TotalAmount,-3,'')
+--					if(@VType<>@vch1)
+--					set @TotAmount=@TotAmount+@Amount
+--					--set @GrTotRec=@GrTotRec+@TotRecAmt
+--					End 
+--					
+--					
+--					set @TempTotAdv=@TotAdv
+----					set @TempOpBal=@OpBal
+----					set @TempTotOpBal=@TotOpBal
+--					end
+--					Fetch next from CurTemp into  @RefNo ,@VchDate,@BillNo,@Amount,@LedgerName,@LedgerNo,@VType
+--				 End 
+--		Close CurTemp Deallocate CurTemp
+--
+--								if(@TotAmount<>0)
+--								Begin
+--								if(@VchType=9)
+--									insert into @Summary values (0,'01-01-1900',@TempLedgerName,@TotAmount,@GrTotRec,@TotAmount-@GrTotRec,0,'')
+--								else if(@VchType=15)
+--								begin
+--								insert into @Summary values (0,'01-01-1900',@TempLedgerName,@TotAmount,@GrTotRec,@TotAmount-@GrTotRec,0,'')
+--									if(@TotAmount-@GrTotRec>0)
+--									set @TempSrt='To Receive'
+--									else if(@TotAmount-@GrTotRec<0)
+--									set @TempSrt='To Pay'
+--									else
+--									set @TempSrt=''
+--									--insert into @Summary values (0,'01-01-1900',@TempSrt,0,0,0,0,'')
+--								end
+--								end
+----
+----insert into @Summary values (0,'01-01-1900','GrandTotal',@GrTotAmt+@TempOpBal,@GrTotRec+@TempOpBal+@TotAdv,(@GrTotAmt+@OpBal)-(@GrTotRec+@TempOpBal+@TotAdv),0,'')
+----								set @GrTotAmt=0	
+--								set @GrTotRec=0
+--								set @TotAmount=0
+--		set @TotalAmount=0
+--		set @TotBalAmt=0
+--		set @DiscAmt=0
+--	
+--
+----Select *  From @Summary
+--Select VoucherUserNo ,VoucherDate,LedgerName ,Debit ,TotRec ,NetBal ,TempBillNo	from @Summary
+----Select SNo AS 'SNo', VchDate AS 'Date', ItemName AS 'Particulars',
+----					   Qty AS 'Qty', Rate AS 'Rate',Vatav as 'Vatav' ,Freight AS 'Freight',Amount AS 'Amount',
+----				   ReceivedAmt AS 'Received',BalanceAmt AS 'Balance' ,chkSelect AS 'Select',PayAmt AS 'PayAmt',Disc AS 'Disc', NewBalAmt as 'New Bal' ,Chk as 'Final',PKStockTrnNo as 'PK' From @Summary
+----
+--
+----/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+--
+--
+--
+
+
+
+
+

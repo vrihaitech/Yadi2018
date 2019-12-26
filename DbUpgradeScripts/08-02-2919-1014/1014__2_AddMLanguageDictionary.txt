@@ -1,0 +1,54 @@
+set ANSI_NULLS ON
+set QUOTED_IDENTIFIER ON
+GO
+--Created on 25/05/2013
+ALTER PROCEDURE [dbo].[AddMLanguageDictionary]
+     @PkSrNo                              numeric(18),
+     @EnglishVal                          varchar(50),
+     @MarathiVal                          nvarchar(50),
+     @HindiVal                          nvarchar(50),
+  @KarnatakaVal                          nvarchar(50),
+	 @CompanyNo						    numeric(18)
+AS
+IF EXISTS(select PkSrNo from MLanguageDictionary
+          where
+          PkSrNo = @PkSrNo)
+     BEGIN
+       --Update existing row
+       UPDATE MLanguageDictionary
+       SET
+          EnglishVal = @EnglishVal,
+          MarathiVal = Case When (@MarathiVal<>'') then @MarathiVal else MarathiVal end,
+          HindiVal = Case When (@HindiVal<>'') then @HindiVal else HindiVal end,
+KarnatakaVal = Case When (@KarnatakaVal<>'') then @KarnatakaVal else KarnatakaVal end,
+		  CompanyNo=@CompanyNo,
+          StatusNo=2
+       WHERE
+          PkSrNo = @PkSrNo
+
+     END
+ELSE
+     BEGIN
+       --Insert new row
+       Declare @Id numeric
+       SELECT @Id=IsNull(Max(PkSrNo),0) From MLanguageDictionary
+       DBCC CHECKIDENT('MLanguageDictionary', RESEED, @Id)
+       INSERT INTO MLanguageDictionary(
+          EnglishVal,
+          MarathiVal,
+          HindiVal,
+KarnatakaVal,
+		  CompanyNo,
+          StatusNo
+)
+       VALUES(
+          @EnglishVal,
+          @MarathiVal,
+          @HindiVal,
+@KarnatakaVal,
+		  @CompanyNo,
+          1
+)
+
+END
+
